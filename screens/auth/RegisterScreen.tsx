@@ -1,9 +1,9 @@
 import { View, Text, StyleSheet } from 'react-native';
 
-export default function JoinPoolScreen() {
+export default function RegisterScreen() {
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A' }}>
-      <Text style={{ color: 'white', fontSize: 24 }}>Unirse a Polla</Text>
+    <View style={styles.container}>
+      <Text style={styles.text}>Registro</Text>
     </View>
   );
 }
@@ -11,9 +11,9 @@ export default function JoinPoolScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#16A34A',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0F172A',
   },
   text: {
     color: 'white',
