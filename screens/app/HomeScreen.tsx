@@ -11,7 +11,7 @@ export default function HomeScreen({ navigation }: any) {
       <FlatList
         data={data}
         keyExtractor={(item) => item.toString()}
-        renderItem={() => <PollCard />}
+        renderItem={() => <PollCard navigation={navigation} />}
       />
 
       <View style={styles.actions}>

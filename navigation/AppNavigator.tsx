@@ -10,6 +10,7 @@ import RegisterScreen from '../screens/auth/RegisterScreen';
 import HomeScreen from '../screens/app/HomeScreen';
 import CreatePoolScreen from '../screens/app/CreatePoolScreen';
 import JoinPoolScreen from '../screens/app/JoinPoolScreen';
+import PoolDetailScreen from '../screens/app/PoolDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -32,6 +33,7 @@ export default function AppNavigator() {
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="CreatePool" component={CreatePoolScreen} />
             <Stack.Screen name="JoinPool" component={JoinPoolScreen} />
+            <Stack.Screen name="PoolDetail" component={PoolDetailScreen} />
           </>
         )}
 

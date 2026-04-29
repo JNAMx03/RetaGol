@@ -1,19 +1,26 @@
-import {View, Text, StyleSheet} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
-export default function PollCard(){
-    return(
-        <View style={styles.card}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Champions League 2026</Text>
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>Champions</Text>
-                </View>
+export default function PollCard({ navigation }: any) {
+  return (
+    <TouchableOpacity
+        style={styles.card}
+        onPress={() =>
+            navigation.navigate('PoolDetail', {
+            name: 'Champions League 2026',
+            })
+        }
+        >
+        <View style={styles.header}>
+            <Text style={styles.title}>Champions League 2026</Text>
+            <View style={styles.badge}>
+            <Text style={styles.badgeText}>Champions</Text>
             </View>
-
-            <Text style={styles.info}>24 participantes</Text>
-            <Text style={styles.code}>Code: CH2026</Text>
         </View>
-    );
+
+        <Text style={styles.info}>👥 24 participantes</Text>
+        <Text style={styles.code}>Código: CH2026</Text>
+    </TouchableOpacity>
+  );
 }
 
 const styles = StyleSheet.create({
