@@ -1,21 +1,34 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import PollCard from '../../components/PollCard';
+
+const data = [1, 2, 3]; // luego será dinámico
 
 export default function HomeScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Mis Pollas</Text>
 
-      <TouchableOpacity style={styles.card}>
-        <Text>Champions League 2026</Text>
-      </TouchableOpacity>
+      <FlatList
+        data={data}
+        keyExtractor={(item) => item.toString()}
+        renderItem={() => <PollCard />}
+      />
 
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('CreatePool')}>
-        <Text style={styles.buttonText}>+ Crear Polla</Text>
-      </TouchableOpacity>
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => navigation.navigate('CreatePool')}
+        >
+          <Text style={styles.buttonText}>+ Crear Polla</Text>
+        </TouchableOpacity>
 
-      <TouchableOpacity style={styles.buttonSecondary} onPress={() => navigation.navigate('JoinPool')}>
-        <Text style={styles.buttonText}>Unirse</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.joinButton}
+          onPress={() => navigation.navigate('JoinPool')}
+        >
+          <Text style={styles.buttonText}>Unirse</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -23,33 +36,36 @@ export default function HomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#F1F5F9',
+    padding: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 15,
   },
-  card: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
-    marginBottom: 20,
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
   },
-  button: {
+  createButton: {
     backgroundColor: '#2563EB',
     padding: 15,
     borderRadius: 10,
-    marginBottom: 10,
+    flex: 1,
+    marginRight: 5,
   },
-  buttonSecondary: {
+  joinButton: {
     backgroundColor: '#16A34A',
     padding: 15,
     borderRadius: 10,
+    flex: 1,
+    marginLeft: 5,
   },
   buttonText: {
     color: 'white',
     textAlign: 'center',
+    fontWeight: 'bold',
   },
 });
