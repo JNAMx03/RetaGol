@@ -1,22 +1,38 @@
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 
-export default function MatchCard() {
+export default function MatchCard({ match, onChange }: any) {
   return (
     <View style={styles.card}>
       
-      <Text style={styles.league}>Champions League</Text>
+      <Text style={styles.league}>{match.league}</Text>
 
       <View style={styles.row}>
-        <Text style={styles.team}>Real Madrid</Text>
+        <Text style={styles.team}>{match.home}</Text>
 
-        <TextInput style={styles.input} keyboardType="numeric" />
+        <TextInput
+          style={styles.input}
+          keyboardType="numeric"
+          value={match.homeScore?.toString()}
+          onChangeText={(value) =>
+            onChange(match.id, 'homeScore', value)
+          }
+        />
+
         <Text style={styles.separator}>-</Text>
-        <TextInput style={styles.input} keyboardType="numeric" />
 
-        <Text style={styles.team}>Barcelona</Text>
+        <TextInput
+          style={styles.input}
+          keyboardType="numeric"
+          value={match.awayScore?.toString()}
+          onChangeText={(value) =>
+            onChange(match.id, 'awayScore', value)
+          }
+        />
+
+        <Text style={styles.team}>{match.away}</Text>
       </View>
 
-      <Text style={styles.date}>Hoy 18:00</Text>
+      <Text style={styles.date}>{match.date}</Text>
 
     </View>
   );
@@ -37,12 +53,10 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
   team: {
     flex: 1,
     fontWeight: 'bold',
-    fontSize: 14,
   },
   input: {
     width: 40,
