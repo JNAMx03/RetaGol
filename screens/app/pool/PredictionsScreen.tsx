@@ -1,8 +1,11 @@
 import { View, FlatList, StyleSheet, TouchableOpacity, Text, Alert} from 'react-native';
 import { useState } from 'react';
 import MatchCard from '../../../components/MatchCard';
+import { useApp } from '../../../context/AppContext';
 
 export default function PredictionsScreen() {
+
+  const { setPredictions } = useApp();
 
   const [matches, setMatches] = useState([
     {
@@ -36,18 +39,9 @@ export default function PredictionsScreen() {
   };
 
   const handleSave = () => {
-    // const invalid = matches.some(
-    //   (m) => m.homeScore === '' || m.awayScore === ''
-    // );
+    setPredictions(matches);
 
-    // if (invalid) {
-    //   Alert.alert('Error', 'Debes completar todos los partidos');
-    //   return;
-    // }
-
-    console.log('Predicciones guardadas:', matches);
-
-    Alert.alert('Éxito', 'Predicciones guardadas correctamente');
+    console.log('Guardado global:', matches);
   };
 
   return (

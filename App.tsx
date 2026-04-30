@@ -1,5 +1,10 @@
 import AppNavigator from './navigation/AppNavigator';
+import { AppProvider } from './context/AppContext';
 
 export default function App() {
-  return <AppNavigator />;
+  return (
+    <AppProvider>
+      <AppNavigator />
+    </AppProvider>
+  );
 }
