@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import PoolCard from '../../components/PoolCard';
 
 /**
  * 🔥 Datos simulados (luego backend)
@@ -41,15 +42,10 @@ export default function HomeScreen({ navigation }: any) {
         data={pools}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
+          <PoolCard
+            pool={item}
             onPress={() => goToPool(item)}
-          >
-            <Text style={styles.name}>{item.name}</Text>
-            <Text style={styles.info}>
-              {item.participants} participantes
-            </Text>
-          </TouchableOpacity>
+          />
         )}
       />
 
