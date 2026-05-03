@@ -11,24 +11,32 @@ import MatchCard from '../../../components/MatchCard';
 
 export default function PredictionsScreen({ route }: any) {
 
-  /**
-   * 👉 obtenemos la polla actual
-   */
   const { pool } = route.params;
 
-  const { predictions, setPredictions } = useApp();
+  const {
+    getPredictionsByPool,
+    savePredictionsByPool,
+  } = useApp();
 
   /**
-   * 🔥 ahora usamos los partidos de la polla
+   * 🔥 estado local
    */
   const [matches, setMatches] = useState(pool.matches);
 
+  /**
+   * 🔄 cargar predicciones de ESA polla
+   */
   useEffect(() => {
-    if (predictions.length > 0) {
-      setMatches(predictions);
-    }
-  }, [predictions]);
+    const saved = getPredictionsByPool(pool.id);
 
+    if (saved.length > 0) {
+      setMatches(saved);
+    }
+  }, []);
+
+  /**
+   * ✏️ editar
+   */
   const handleChange = (id: string, field: string, value: string) => {
     setMatches((prev:any) =>
       prev.map((match:any) =>
@@ -37,8 +45,11 @@ export default function PredictionsScreen({ route }: any) {
     );
   };
 
+  /**
+   * 💾 guardar SOLO en esa polla
+   */
   const handleSave = () => {
-    setPredictions(matches);
+    savePredictionsByPool(pool.id, matches);
   };
 
   return (

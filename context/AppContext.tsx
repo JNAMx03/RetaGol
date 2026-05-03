@@ -4,10 +4,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const AppContext = createContext<any>(null);
 
 export function AppProvider({ children }: any) {
-  const [predictions, setPredictions] = useState([]);
+
+  /**
+   * 🔥 Ahora es un objeto por poolId
+   */
+  const [predictions, setPredictions] = useState<any>({});
   const [loading, setLoading] = useState(true);
 
-  // CARGAR
+  /**
+   * 📥 Cargar desde storage
+   */
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -15,7 +21,7 @@ export function AppProvider({ children }: any) {
 
         if (data) {
           const parsed = JSON.parse(data);
-          console.log('📥 Cargando desde storage:', parsed);
+          console.log('📥 Cargando:', parsed);
           setPredictions(parsed);
         }
       } catch (e) {
@@ -28,15 +34,17 @@ export function AppProvider({ children }: any) {
     loadData();
   }, []);
 
-  // GUARDAR
+  /**
+   * 💾 Guardar automáticamente
+   */
   useEffect(() => {
     const saveData = async () => {
       try {
-        console.log('💾 Guardando:', predictions);
         await AsyncStorage.setItem(
           'predictions',
           JSON.stringify(predictions)
         );
+        console.log('💾 Guardado:', predictions);
       } catch (e) {
         console.log('❌ Error guardando:', e);
       }
@@ -48,20 +56,40 @@ export function AppProvider({ children }: any) {
   }, [predictions, loading]);
 
   /**
-   * 🧹 Limpiar predicciones (memoria + storage) SOLO ES PARA PRUEBAS
+   * 🧠 Obtener predicciones de una polla
+   */
+  const getPredictionsByPool = (poolId: string) => {
+    return predictions[poolId] || [];
+  };
+
+  /**
+   * 🧠 Guardar predicciones de una polla
+   */
+  const savePredictionsByPool = (poolId: string, matches: any[]) => {
+    setPredictions((prev: any) => ({
+      ...prev,
+      [poolId]: matches,
+    }));
+  };
+
+  /**
+   * 🧹 Limpiar
    */
   const clearPredictions = async () => {
-    try {
-      await AsyncStorage.removeItem('predictions'); // borra del storage
-      setPredictions([]); // borra del estado
-      console.log('🧹 Predicciones eliminadas');
-    } catch (e) {
-      console.log('❌ Error limpiando:', e);
-    }
+    await AsyncStorage.removeItem('predictions');
+    setPredictions({});
   };
 
   return (
-    <AppContext.Provider value={{ predictions, setPredictions, loading, clearPredictions }}>
+    <AppContext.Provider
+      value={{
+        predictions,
+        getPredictionsByPool,
+        savePredictionsByPool,
+        clearPredictions,
+        loading,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

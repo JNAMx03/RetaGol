@@ -2,7 +2,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useApp } from '../../../context/AppContext';
 
 /**
- * 🔥 Resultados simulados
+ * 🔥 Resultados simulados (luego backend)
  */
 const results = [
   { id: '1', homeScore: '2', awayScore: '1' },
@@ -10,15 +10,29 @@ const results = [
 ];
 
 /**
- * 👤 Usuario actual (luego vendrá del backend)
+ * 👤 Usuario actual (simulado)
  */
 const currentUser = 'Nico';
 
-export default function StandingsScreen() {
-  const { predictions } = useApp();
+export default function StandingsScreen({ route }: any) {
 
   /**
-   * 🧠 Calcula puntos por usuario
+   * 🔥 Obtenemos la polla actual
+   */
+  const { pool } = route.params;
+
+  /**
+   * 🔥 Traemos función del contexto
+   */
+  const { getPredictionsByPool } = useApp();
+
+  /**
+   * 🔥 SOLO predicciones de esta polla
+   */
+  const myPredictions = getPredictionsByPool(pool.id);
+
+  /**
+   * 🧠 Calcula puntos
    */
   const calculatePoints = (userPredictions: any[]) => {
     let total = 0;
@@ -28,12 +42,15 @@ export default function StandingsScreen() {
 
       if (!result) return;
 
+      // exacto
       if (
         pred.homeScore === result.homeScore &&
         pred.awayScore === result.awayScore
       ) {
         total += 3;
-      } else if (
+      }
+      // ganador
+      else if (
         (pred.homeScore > pred.awayScore &&
           result.homeScore > result.awayScore) ||
         (pred.homeScore < pred.awayScore &&
@@ -54,17 +71,17 @@ export default function StandingsScreen() {
   const users = [
     {
       name: currentUser,
-      predictions,
+      predictions: myPredictions, // 🔥 SOLO ESTA POLLA
     },
     {
-      name: 'Venki',
+      name: 'Emily',
       predictions: [
         { id: '1', homeScore: '1', awayScore: '1' },
         { id: '2', homeScore: '0', awayScore: '0' },
       ],
     },
     {
-      name: 'Emily',
+      name: 'Venki',
       predictions: [
         { id: '1', homeScore: '2', awayScore: '1' },
         { id: '2', homeScore: '1', awayScore: '0' },
@@ -90,7 +107,7 @@ export default function StandingsScreen() {
     .sort((a, b) => b.points - a.points);
 
   /**
-   * 🎨 Color para podio
+   * 🎨 Colores del podio
    */
   const getPodiumColor = (index: number) => {
     if (index === 0) return '#FACC15'; // oro
@@ -117,10 +134,14 @@ export default function StandingsScreen() {
             ]}
           >
             <Text style={styles.position}>{index + 1}</Text>
+
             <Text style={styles.name}>
               {user.name} {isMe && '(Tú)'}
             </Text>
-            <Text style={styles.points}>{user.points} pts</Text>
+
+            <Text style={styles.points}>
+              {user.points} pts
+            </Text>
           </View>
         );
       })}
