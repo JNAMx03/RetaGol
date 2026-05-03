@@ -5,60 +5,41 @@ import {
   TouchableOpacity,
   Text,
 } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../../../context/AppContext';
 import MatchCard from '../../../components/MatchCard';
 
-const initialMatches = [
-  {
-    id: '1',
-    league: 'Champions League',
-    home: 'Real Madrid',
-    away: 'Barcelona',
-    date: 'Hoy 18:00',
-    homeScore: '',
-    awayScore: '',
-  },
-  {
-    id: '2',
-    league: 'Premier League',
-    home: 'Arsenal',
-    away: 'Chelsea',
-    date: 'Mañana 20:00',
-    homeScore: '',
-    awayScore: '',
-  },
-];
+export default function PredictionsScreen({ route }: any) {
 
-export default function PredictionsScreen() {
-  const { predictions, setPredictions, loading } = useApp();
+  /**
+   * 👉 obtenemos la polla actual
+   */
+  const { pool } = route.params;
 
-  const [matches, setMatches] = useState(initialMatches);
+  const { predictions, setPredictions } = useApp();
 
-  // SINCRONIZAR SOLO SI HAY DATOS
+  /**
+   * 🔥 ahora usamos los partidos de la polla
+   */
+  const [matches, setMatches] = useState(pool.matches);
+
   useEffect(() => {
     if (predictions.length > 0) {
-      console.log('🔄 Sincronizando desde contexto');
       setMatches(predictions);
     }
   }, [predictions]);
 
   const handleChange = (id: string, field: string, value: string) => {
-    setMatches((prev) =>
-      prev.map((match) =>
+    setMatches((prev:any) =>
+      prev.map((match:any) =>
         match.id === id ? { ...match, [field]: value } : match
       )
     );
   };
 
   const handleSave = () => {
-    console.log('✅ Guardando global:', matches);
     setPredictions(matches);
   };
-
-  if (loading) {
-    return <Text>Cargando...</Text>;
-  }
 
   return (
     <View style={styles.container}>

@@ -1,43 +1,51 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
 import PoolCard from '../../components/PoolCard';
 
 /**
- * 🔥 Datos simulados (luego backend)
+ * 🔥 Ahora cada polla tiene sus propios partidos
  */
 const pools = [
   {
     id: '1',
     name: 'Champions League',
     participants: 10,
+    matches: [
+      {
+        id: '1',
+        home: 'Real Madrid',
+        away: 'Barcelona',
+        date: 'Hoy 18:00',
+        homeScore: '',
+        awayScore: '',
+      },
+    ],
   },
   {
     id: '2',
     name: 'Premier League',
     participants: 8,
-  },
-  {
-    id: '3',
-    name: 'Liga Española',
-    participants: 12,
+    matches: [
+      {
+        id: '2',
+        home: 'Arsenal',
+        away: 'Chelsea',
+        date: 'Mañana 20:00',
+        homeScore: '',
+        awayScore: '',
+      },
+    ],
   },
 ];
 
 export default function HomeScreen({ navigation }: any) {
-
-  /**
-   * 👉 Navegar a detalle de la polla
-   */
   const goToPool = (pool: any) => {
     navigation.navigate('PoolDetail', { pool });
   };
 
   return (
     <View style={styles.container}>
-
-      {/* 🧾 Título */}
       <Text style={styles.title}>⚽ Tus Pollas</Text>
 
-      {/* 📋 Lista */}
       <FlatList
         data={pools}
         keyExtractor={(item) => item.id}
@@ -48,25 +56,10 @@ export default function HomeScreen({ navigation }: any) {
           />
         )}
       />
-
-      {/* ➕ Botones abajo */}
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Crear</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Unirse</Text>
-        </TouchableOpacity>
-      </View>
-
     </View>
   );
 }
 
-/**
- * 🎨 Estilos
- */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -77,36 +70,5 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 15,
-  },
-  card: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
-  },
-  name: {
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  info: {
-    color: '#64748B',
-    marginTop: 5,
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  button: {
-    backgroundColor: '#16A34A',
-    padding: 15,
-    borderRadius: 10,
-    flex: 1,
-    marginHorizontal: 5,
-  },
-  buttonText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
   },
 });
