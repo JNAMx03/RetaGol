@@ -1,5 +1,8 @@
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import PoolCard from '../../components/PoolCard';
+
+//SOLO ES PARA PRUEBAS
+import { useApp } from '../../context/AppContext';
 
 /**
  * 🔥 Ahora cada polla tiene sus propios partidos
@@ -38,6 +41,10 @@ const pools = [
 ];
 
 export default function HomeScreen({ navigation }: any) {
+
+  //SOLO ES PARA PRUEBAS
+  const { clearPredictions } = useApp();
+
   const goToPool = (pool: any) => {
     navigation.navigate('PoolDetail', { pool });
   };
@@ -56,6 +63,10 @@ export default function HomeScreen({ navigation }: any) {
           />
         )}
       />
+{/* SOLO ES PARA PRUEBAS */}
+      <TouchableOpacity onPress={clearPredictions}>
+        <Text>Borrar datos</Text>
+      </TouchableOpacity>
     </View>
   );
 }

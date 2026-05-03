@@ -47,8 +47,21 @@ export function AppProvider({ children }: any) {
     }
   }, [predictions, loading]);
 
+  /**
+   * 🧹 Limpiar predicciones (memoria + storage) SOLO ES PARA PRUEBAS
+   */
+  const clearPredictions = async () => {
+    try {
+      await AsyncStorage.removeItem('predictions'); // borra del storage
+      setPredictions([]); // borra del estado
+      console.log('🧹 Predicciones eliminadas');
+    } catch (e) {
+      console.log('❌ Error limpiando:', e);
+    }
+  };
+
   return (
-    <AppContext.Provider value={{ predictions, setPredictions, loading }}>
+    <AppContext.Provider value={{ predictions, setPredictions, loading, clearPredictions }}>
       {children}
     </AppContext.Provider>
   );
