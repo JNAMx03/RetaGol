@@ -68,33 +68,12 @@ export default function StandingsScreen({ route }: any) {
   /**
    * 👥 Usuarios simulados
    */
-  const users = [
-    {
-      name: currentUser,
-      predictions: myPredictions, // 🔥 SOLO ESTA POLLA
-    },
-    {
-      name: 'Emily',
-      predictions: [
-        { id: '1', homeScore: '1', awayScore: '1' },
-        { id: '2', homeScore: '0', awayScore: '0' },
-      ],
-    },
-    {
-      name: 'Venki',
-      predictions: [
-        { id: '1', homeScore: '2', awayScore: '1' },
-        { id: '2', homeScore: '1', awayScore: '0' },
-      ],
-    },
-    {
-      name: '117',
-      predictions: [
-        { id: '1', homeScore: '0', awayScore: '3' },
-        { id: '2', homeScore: '2', awayScore: '2' },
-      ],
-    },
-  ];
+  const poolPredictions = myPredictions[pool.id] || {};
+
+  const users = Object.keys(poolPredictions).map((userId) => ({
+    name: userId,
+    predictions: poolPredictions[userId],
+  }));
 
   /**
    * 🏆 Ranking ordenado

@@ -5,6 +5,11 @@ const AppContext = createContext<any>(null);
 
 export function AppProvider({ children }: any) {
 
+  const [user, setUser] = useState({
+    id: 'user1',
+    name: 'Nico',
+  });
+
   /**
    * 🔥 Ahora es un objeto por poolId
    */
@@ -59,7 +64,7 @@ export function AppProvider({ children }: any) {
    * 🧠 Obtener predicciones de una polla
    */
   const getPredictionsByPool = (poolId: string) => {
-    return predictions[poolId] || [];
+    return predictions[poolId]?.[user.id] || [];
   };
 
   /**
@@ -68,7 +73,10 @@ export function AppProvider({ children }: any) {
   const savePredictionsByPool = (poolId: string, matches: any[]) => {
     setPredictions((prev: any) => ({
       ...prev,
-      [poolId]: matches,
+      [poolId]: {
+        ...prev[poolId],
+        [user.id]: matches,
+      },
     }));
   };
 
@@ -88,6 +96,8 @@ export function AppProvider({ children }: any) {
         savePredictionsByPool,
         clearPredictions,
         loading,
+        user,
+        setUser,
       }}
     >
       {children}
