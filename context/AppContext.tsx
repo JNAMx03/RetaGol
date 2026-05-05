@@ -5,32 +5,54 @@ const AppContext = createContext<any>(null);
 
 export function AppProvider({ children }: any) {
 
+  /**
+   * 👤 Usuario simulado (luego vendrá del backend)
+   */
   const [user, setUser] = useState({
     id: 'user1',
     name: 'Nico',
   });
 
   /**
-   * 🔥 Ahora es un objeto por poolId
+   * 🏆 Pools (pollas)
+   */
+  const [pools, setPools] = useState<any[]>([]);
+
+  /**
+   * 📊 Predicciones
+   * Estructura:
+   * {
+   *   poolId: {
+   *     userId: [matches]
+   *   }
+   * }
    */
   const [predictions, setPredictions] = useState<any>({});
+
+  /**
+   * ⏳ Estado de carga
+   */
   const [loading, setLoading] = useState(true);
 
   /**
-   * 📥 Cargar desde storage
+   * 📥 Cargar datos al iniciar
    */
   useEffect(() => {
     const loadData = async () => {
       try {
-        const data = await AsyncStorage.getItem('predictions');
+        const storedPools = await AsyncStorage.getItem('pools');
+        const storedPredictions = await AsyncStorage.getItem('predictions');
 
-        if (data) {
-          const parsed = JSON.parse(data);
-          console.log('📥 Cargando:', parsed);
-          setPredictions(parsed);
+        if (storedPools) {
+          setPools(JSON.parse(storedPools));
         }
+
+        if (storedPredictions) {
+          setPredictions(JSON.parse(storedPredictions));
+        }
+
       } catch (e) {
-        console.log('❌ Error cargando:', e);
+        console.log('❌ Error cargando datos:', e);
       } finally {
         setLoading(false);
       }
@@ -40,35 +62,74 @@ export function AppProvider({ children }: any) {
   }, []);
 
   /**
-   * 💾 Guardar automáticamente
+   * 💾 Guardar pools automáticamente
    */
   useEffect(() => {
-    const saveData = async () => {
+    const savePools = async () => {
+      try {
+        await AsyncStorage.setItem('pools', JSON.stringify(pools));
+      } catch (e) {
+        console.log('❌ Error guardando pools:', e);
+      }
+    };
+
+    if (!loading) {
+      savePools();
+    }
+  }, [pools, loading]);
+
+  /**
+   * 💾 Guardar predicciones automáticamente
+   */
+  useEffect(() => {
+    const savePredictions = async () => {
       try {
         await AsyncStorage.setItem(
           'predictions',
           JSON.stringify(predictions)
         );
-        console.log('💾 Guardado:', predictions);
       } catch (e) {
-        console.log('❌ Error guardando:', e);
+        console.log('❌ Error guardando predicciones:', e);
       }
     };
 
     if (!loading) {
-      saveData();
+      savePredictions();
     }
   }, [predictions, loading]);
 
   /**
-   * 🧠 Obtener predicciones de una polla
+   * ➕ Crear nueva polla
+   */
+  const createPool = (name: string) => {
+    const newPool = {
+      id: Date.now().toString(),
+      name,
+      participants: 1,
+      matches: [
+        {
+          id: '1',
+          home: 'Equipo A',
+          away: 'Equipo B',
+          date: 'Próximamente',
+          homeScore: '',
+          awayScore: '',
+        },
+      ],
+    };
+
+    setPools((prev) => [...prev, newPool]);
+  };
+
+  /**
+   * 📥 Obtener predicciones de una polla (del usuario actual)
    */
   const getPredictionsByPool = (poolId: string) => {
     return predictions[poolId]?.[user.id] || [];
   };
 
   /**
-   * 🧠 Guardar predicciones de una polla
+   * 💾 Guardar predicciones por polla y usuario
    */
   const savePredictionsByPool = (poolId: string, matches: any[]) => {
     setPredictions((prev: any) => ({
@@ -81,23 +142,31 @@ export function AppProvider({ children }: any) {
   };
 
   /**
-   * 🧹 Limpiar
+   * 🧹 Limpiar todo (debug / logout futuro)
    */
-  const clearPredictions = async () => {
-    await AsyncStorage.removeItem('predictions');
-    setPredictions({});
+  const clearAllData = async () => {
+    try {
+      await AsyncStorage.clear();
+      setPools([]);
+      setPredictions({});
+      console.log('🧹 Todo limpiado');
+    } catch (e) {
+      console.log('❌ Error limpiando:', e);
+    }
   };
 
   return (
     <AppContext.Provider
       value={{
+        user,
+        setUser,
+        pools,
+        createPool,
         predictions,
         getPredictionsByPool,
         savePredictionsByPool,
-        clearPredictions,
+        clearAllData,
         loading,
-        user,
-        setUser,
       }}
     >
       {children}

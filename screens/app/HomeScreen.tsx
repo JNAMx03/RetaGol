@@ -1,46 +1,10 @@
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { useApp } from '../../context/AppContext';
 import PoolCard from '../../components/PoolCard';
 
-//SOLO ES PARA PRUEBAS
-import { useApp } from '../../context/AppContext';
-
-/**
- * 🔥 Ahora cada polla tiene sus propios partidos
- */
-const pools = [
-  {
-    id: '1',
-    name: 'Champions League',
-    participants: 10,
-    matches: [
-      {
-        id: '1',
-        home: 'Real Madrid',
-        away: 'Barcelona',
-        date: 'Hoy 18:00',
-        homeScore: '',
-        awayScore: '',
-      },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Premier League',
-    participants: 8,
-    matches: [
-      {
-        id: '2',
-        home: 'Arsenal',
-        away: 'Chelsea',
-        date: 'Mañana 20:00',
-        homeScore: '',
-        awayScore: '',
-      },
-    ],
-  },
-];
-
 export default function HomeScreen({ navigation }: any) {
+
+  const { pools } = useApp();
 
   //SOLO ES PARA PRUEBAS
   const { clearPredictions } = useApp();
@@ -51,6 +15,7 @@ export default function HomeScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
+
       <Text style={styles.title}>⚽ Tus Pollas</Text>
 
       <FlatList
@@ -63,10 +28,19 @@ export default function HomeScreen({ navigation }: any) {
           />
         )}
       />
-{/* SOLO ES PARA PRUEBAS */}
+
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => navigation.navigate('CreatePool')}
+      >
+        <Text style={styles.text}>+ Crear Polla</Text>
+      </TouchableOpacity>
+
+      {/* SOLO ES PARA PRUEBAS */}
       <TouchableOpacity onPress={clearPredictions}>
         <Text>Borrar datos</Text>
       </TouchableOpacity>
+
     </View>
   );
 }
@@ -81,5 +55,16 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 15,
+  },
+  button: {
+    backgroundColor: '#16A34A',
+    padding: 15,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  text: {
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: 'bold',
   },
 });
