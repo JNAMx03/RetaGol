@@ -1,143 +1,147 @@
-import { View, Text, StyleSheet } from 'react-native';
-import { useApp } from '../../../context/AppContext';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { useApp, Match } from '../../../context/AppContext';
 
-const results = [
-  {
-    id: '1',
-    home: 'Real Madrid',
-    away: 'Barcelona',
-    homeScore: '2',
-    awayScore: '1',
-  },
-  {
-    id: '2',
-    home: 'Arsenal',
-    away: 'Chelsea',
-    homeScore: '0',
-    awayScore: '0',
-  },
-];
+// Resultados simulados por ID de partido (luego vendrán del backend)
+const MOCK_RESULTS: Record<string, { homeScore: string; awayScore: string }> = {
+  ch1: { homeScore: '2', awayScore: '1' },
+  ch2: { homeScore: '1', awayScore: '1' },
+  ch3: { homeScore: '3', awayScore: '2' },
+  ch4: { homeScore: '0', awayScore: '2' },
+  l1:  { homeScore: '1', awayScore: '2' },
+  l2:  { homeScore: '0', awayScore: '0' },
+  l3:  { homeScore: '2', awayScore: '1' },
+  l4:  { homeScore: '3', awayScore: '0' },
+  c1:  { homeScore: '2', awayScore: '0' },
+  c2:  { homeScore: '1', awayScore: '1' },
+  c3:  { homeScore: '0', awayScore: '1' },
+};
+
+type ResultType = 'exact' | 'winner' | 'fail' | 'none';
+
+function getResultType(pred: Match | undefined, result: { homeScore: string; awayScore: string } | undefined): ResultType {
+  if (!pred || pred.homeScore === '' || pred.awayScore === '') return 'none';
+  if (!result) return 'none';
+
+  const pH = Number(pred.homeScore), pA = Number(pred.awayScore);
+  const rH = Number(result.homeScore), rA = Number(result.awayScore);
+
+  if (pH === rH && pA === rA) return 'exact';
+  if ((pH > pA && rH > rA) || (pH < pA && rH < rA) || (pH === pA && rH === rA)) return 'winner';
+  return 'fail';
+}
+
+const POINTS: Record<ResultType, number> = { exact: 3, winner: 1, fail: 0, none: 0 };
+const COLORS: Record<ResultType, string> = {
+  exact: '#16A34A',
+  winner: '#EAB308',
+  fail: '#DC2626',
+  none: '#94A3B8',
+};
 
 export default function ResultsScreen({ route }: any) {
-
-  /**
-   * 🔥 obtenemos la polla actual
-   */
   const { pool } = route.params;
-
   const { getPredictionsByPool } = useApp();
-
-  /**
-   * 🔥 SOLO predicciones de esta polla
-   */
   const predictions = getPredictionsByPool(pool.id);
-
-  const getResultType = (pred: any, result: any) => {
-    if (!pred || pred.homeScore === '' || pred.awayScore === '') {
-      return 'none';
-    }
-
-    const predHome = Number(pred.homeScore);
-    const predAway = Number(pred.awayScore);
-    const resHome = Number(result.homeScore);
-    const resAway = Number(result.awayScore);
-
-    if (predHome === resHome && predAway === resAway) {
-      return 'exact';
-    }
-
-    if (
-      (predHome > predAway && resHome > resAway) ||
-      (predHome < predAway && resHome < resAway) ||
-      (predHome === predAway && resHome === resAway)
-    ) {
-      return 'winner';
-    }
-
-    return 'fail';
-  };
-
-  const getPoints = (type: string) => {
-    if (type === 'exact') return 3;
-    if (type === 'winner') return 1;
-    return 0;
-  };
-
-  const getColor = (type: string) => {
-    if (type === 'exact') return '#16A34A';
-    if (type === 'winner') return '#EAB308';
-    if (type === 'fail') return '#DC2626';
-    return '#64748B';
-  };
+  const matches: Match[] = pool.matches ?? [];
 
   return (
-    <View style={styles.container}>
-      {results.map((match) => {
-
-        /**
-         * 🔥 buscar SOLO dentro de esta polla
-         */
-        const pred = predictions.find((p: any) => p.id === match.id);
-
-        const type = getResultType(pred, match);
-        const points = getPoints(type);
-        const color = getColor(type);
+    <ScrollView style={styles.container} contentContainerStyle={styles.list}>
+      {matches.map((match) => {
+        const pred = predictions.find((p) => p.id === match.id);
+        const result = MOCK_RESULTS[match.id];
+        const type = getResultType(pred, result);
+        const points = POINTS[type];
+        const color = COLORS[type];
+        const hasFinalScore = !!result;
 
         return (
           <View key={match.id} style={styles.card}>
+            <Text style={styles.date}>{match.date}</Text>
 
-            <Text style={styles.title}>
-              {match.home} {match.homeScore} - {match.awayScore} {match.away}
-            </Text>
+            <View style={styles.resultRow}>
+              <View style={styles.matchInfo}>
+                {hasFinalScore ? (
+                  <Text style={styles.matchTitle}>
+                    {match.home} {result!.homeScore} - {result!.awayScore} {match.away}
+                  </Text>
+                ) : (
+                  <Text style={styles.matchTitle}>
+                    {match.home} vs {match.away}
+                  </Text>
+                )}
 
-            {pred && (
-              <Text style={styles.pred}>
-                Tu predicción: {pred.homeScore || '-'} - {pred.awayScore || '-'}
-              </Text>
-            )}
+                <Text style={styles.prediction}>
+                  Tu predicción:{' '}
+                  {pred ? `${pred.homeScore || '-'} - ${pred.awayScore || '-'}` : 'Sin predicción'}
+                </Text>
+              </View>
 
-            <Text style={[styles.status, { color }]}>
-              {type === 'exact' && '✔ Exacto'}
-              {type === 'winner' && '👍 Ganador'}
-              {type === 'fail' && '✖ Fallaste'}
-              {type === 'none' && '— Sin predicción'}
-            </Text>
-
-            <Text style={[styles.points, { color }]}>
-              {points} pts
-            </Text>
-
+              <View style={[styles.badge, { backgroundColor: color }]}>
+                <Text style={styles.badgeText}>
+                  {hasFinalScore ? `${points} pt${points !== 1 ? 's' : ''}` : '—'}
+                </Text>
+              </View>
+            </View>
           </View>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 15,
     backgroundColor: '#F1F5F9',
+  },
+  list: {
+    padding: 16,
   },
   card: {
     backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 12,
+    padding: 16,
+    borderRadius: 14,
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  title: {
-    fontWeight: 'bold',
+  date: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginBottom: 10,
   },
-  pred: {
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  matchInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  matchTitle: {
+    fontWeight: '700',
+    color: '#0F172A',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  prediction: {
     color: '#64748B',
+    fontSize: 13,
   },
-  status: {
-    marginTop: 5,
-    fontWeight: 'bold',
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    minWidth: 54,
+    alignItems: 'center',
   },
-  points: {
-    marginTop: 5,
+  badgeText: {
+    color: 'white',
     fontWeight: 'bold',
+    fontSize: 13,
   },
 });

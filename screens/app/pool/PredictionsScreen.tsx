@@ -1,53 +1,25 @@
-import {
-  View,
-  FlatList,
-  StyleSheet,
-  TouchableOpacity,
-  Text,
-} from 'react-native';
+import { View, FlatList, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { useState, useEffect } from 'react';
-import { useApp } from '../../../context/AppContext';
+import { useApp, Match } from '../../../context/AppContext';
 import MatchCard from '../../../components/MatchCard';
 
 export default function PredictionsScreen({ route }: any) {
-
   const { pool } = route.params;
+  const { getPredictionsByPool, savePredictionsByPool } = useApp();
+  const [matches, setMatches] = useState<Match[]>(pool.matches);
 
-  const {
-    getPredictionsByPool,
-    savePredictionsByPool,
-  } = useApp();
-
-  /**
-   * 🔥 estado local
-   */
-  const [matches, setMatches] = useState(pool.matches);
-
-  /**
-   * 🔄 cargar predicciones de ESA polla
-   */
+  // Cargar predicciones guardadas de esta polla al entrar
   useEffect(() => {
     const saved = getPredictionsByPool(pool.id);
-
-    if (saved.length > 0) {
-      setMatches(saved);
-    }
+    if (saved.length > 0) setMatches(saved);
   }, []);
 
-  /**
-   * ✏️ editar
-   */
   const handleChange = (id: string, field: string, value: string) => {
-    setMatches((prev:any) =>
-      prev.map((match:any) =>
-        match.id === id ? { ...match, [field]: value } : match
-      )
+    setMatches((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, [field]: value } : m))
     );
   };
 
-  /**
-   * 💾 guardar SOLO en esa polla
-   */
   const handleSave = () => {
     savePredictionsByPool(pool.id, matches);
   };
@@ -57,14 +29,17 @@ export default function PredictionsScreen({ route }: any) {
       <FlatList
         data={matches}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <MatchCard match={item} onChange={handleChange} />
         )}
       />
 
-      <TouchableOpacity style={styles.button} onPress={handleSave}>
-        <Text style={styles.text}>Guardar</Text>
-      </TouchableOpacity>
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.btn} onPress={handleSave}>
+          <Text style={styles.btnText}>✓  Guardar</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -72,18 +47,26 @@ export default function PredictionsScreen({ route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 15,
     backgroundColor: '#F1F5F9',
   },
-  button: {
-    backgroundColor: '#16A34A',
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 10,
+  list: {
+    padding: 16,
   },
-  text: {
+  footer: {
+    padding: 16,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  btn: {
+    backgroundColor: '#16A34A',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  btnText: {
     color: 'white',
-    textAlign: 'center',
     fontWeight: 'bold',
+    fontSize: 15,
   },
 });

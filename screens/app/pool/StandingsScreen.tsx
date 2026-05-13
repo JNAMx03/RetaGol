@@ -1,166 +1,189 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useApp } from '../../../context/AppContext';
 
-/**
- * 🔥 Resultados simulados (luego backend)
- */
-const results = [
-  { id: '1', homeScore: '2', awayScore: '1' },
-  { id: '2', homeScore: '0', awayScore: '0' },
+// Resultados simulados (luego vendrán del backend)
+const MOCK_RESULTS: Record<string, { homeScore: string; awayScore: string }> = {
+  ch1: { homeScore: '2', awayScore: '1' },
+  ch2: { homeScore: '1', awayScore: '1' },
+  ch3: { homeScore: '3', awayScore: '2' },
+  ch4: { homeScore: '0', awayScore: '2' },
+  l1:  { homeScore: '1', awayScore: '2' },
+  l2:  { homeScore: '0', awayScore: '0' },
+  l3:  { homeScore: '2', awayScore: '1' },
+  l4:  { homeScore: '3', awayScore: '0' },
+  c1:  { homeScore: '2', awayScore: '0' },
+  c2:  { homeScore: '1', awayScore: '1' },
+  c3:  { homeScore: '0', awayScore: '1' },
+};
+
+// Participantes simulados para demo (luego se leerán del backend)
+const MOCK_PARTICIPANTS = [
+  {
+    id: 'p1', name: 'John Doe',
+    predictions: [
+      { id: 'ch1', homeScore: '2', awayScore: '8' },
+      { id: 'ch2', homeScore: '2', awayScore: '0' },
+      { id: 'ch3', homeScore: '3', awayScore: '2' },
+      { id: 'ch4', homeScore: '0', awayScore: '2' },
+    ],
+  },
+  {
+    id: 'p2', name: 'Jane Smith',
+    predictions: [
+      { id: 'ch1', homeScore: '1', awayScore: '0' },
+      { id: 'ch2', homeScore: '1', awayScore: '1' },
+      { id: 'ch3', homeScore: '3', awayScore: '1' },
+      { id: 'ch4', homeScore: '1', awayScore: '2' },
+    ],
+  },
+  {
+    id: 'p3', name: 'Mike Johnson',
+    predictions: [
+      { id: 'ch1', homeScore: '2', awayScore: '1' },
+      { id: 'ch2', homeScore: '0', awayScore: '0' },
+      { id: 'ch3', homeScore: '2', awayScore: '2' },
+      { id: 'ch4', homeScore: '0', awayScore: '3' },
+    ],
+  },
 ];
 
-/**
- * 👤 Usuario actual (simulado)
- */
-const currentUser = 'Nico';
+function calcPoints(predictions: { id: string; homeScore: string; awayScore: string }[]): number {
+  let total = 0;
+  predictions.forEach((pred) => {
+    const result = MOCK_RESULTS[pred.id];
+    if (!result) return;
+    const pH = Number(pred.homeScore), pA = Number(pred.awayScore);
+    const rH = Number(result.homeScore), rA = Number(result.awayScore);
+    if (pH === rH && pA === rA) total += 3;
+    else if ((pH > pA && rH > rA) || (pH < pA && rH < rA) || (pH === pA && rH === rA)) total += 1;
+  });
+  return total;
+}
 
-export default function StandingsScreen({ route }: any) {
+const PODIUM_COLORS = ['#FACC15', '#94A3B8', '#B45309'];
 
-  /**
-   * 🔥 Obtenemos la polla actual
-   */
-  const { pool } = route.params;
+export default function StandingsScreen() {
+  const { user } = useApp();
 
-  /**
-   * 🔥 Traemos función del contexto
-   */
-  const { getPredictionsByPool } = useApp();
-
-  /**
-   * 🔥 SOLO predicciones de esta polla
-   */
-  const myPredictions = getPredictionsByPool(pool.id);
-
-  /**
-   * 🧠 Calcula puntos
-   */
-  const calculatePoints = (userPredictions: any[]) => {
-    let total = 0;
-
-    userPredictions.forEach((pred) => {
-      const result = results.find((r) => r.id === pred.id);
-
-      if (!result) return;
-
-      // exacto
-      if (
-        pred.homeScore === result.homeScore &&
-        pred.awayScore === result.awayScore
-      ) {
-        total += 3;
-      }
-      // ganador
-      else if (
-        (pred.homeScore > pred.awayScore &&
-          result.homeScore > result.awayScore) ||
-        (pred.homeScore < pred.awayScore &&
-          result.homeScore < result.awayScore) ||
-        (pred.homeScore === pred.awayScore &&
-          result.homeScore === result.awayScore)
-      ) {
-        total += 1;
-      }
-    });
-
-    return total;
-  };
-
-  /**
-   * 👥 Usuarios simulados
-   */
-  const poolPredictions = myPredictions[pool.id] || {};
-
-  const users = Object.keys(poolPredictions).map((userId) => ({
-    name: userId,
-    predictions: poolPredictions[userId],
-  }));
-
-  /**
-   * 🏆 Ranking ordenado
-   */
-  const ranking = users
-    .map((user) => ({
-      name: user.name,
-      points: calculatePoints(user.predictions),
-    }))
+  const ranking = MOCK_PARTICIPANTS
+    .map((p) => ({ ...p, points: calcPoints(p.predictions) }))
     .sort((a, b) => b.points - a.points);
 
-  /**
-   * 🎨 Colores del podio
-   */
-  const getPodiumColor = (index: number) => {
-    if (index === 0) return '#FACC15'; // oro
-    if (index === 1) return '#94A3B8'; // plata
-    if (index === 2) return '#B45309'; // bronce
-    return '#FFFFFF';
-  };
-
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.list}>
+      {/* Encabezado de la tabla */}
+      <View style={styles.tableHeader}>
+        <Text style={styles.colHash}>#</Text>
+        <Text style={styles.colName}>Participante</Text>
+        <Text style={styles.colPts}>Puntos</Text>
+      </View>
 
-      <Text style={styles.title}>🏆 Clasificación</Text>
-
-      {ranking.map((user, index) => {
-        const isMe = user.name === currentUser;
+      {ranking.map((participant, index) => {
+        const isMe = participant.name === user.name;
+        const badgeColor = PODIUM_COLORS[index] ?? '#E2E8F0';
 
         return (
-          <View
-            key={index}
-            style={[
-              styles.row,
-              { backgroundColor: getPodiumColor(index) },
-              isMe && styles.me,
-            ]}
-          >
-            <Text style={styles.position}>{index + 1}</Text>
+          <View key={participant.id} style={[styles.row, isMe && styles.rowMe]}>
+            <View style={[styles.posBadge, { backgroundColor: badgeColor }]}>
+              <Text style={styles.posText}>{index + 1}</Text>
+            </View>
 
-            <Text style={styles.name}>
-              {user.name} {isMe && '(Tú)'}
+            <Text style={[styles.nameText, isMe && styles.nameMe]} numberOfLines={1}>
+              {participant.name}
             </Text>
 
-            <Text style={styles.points}>
-              {user.points} pts
+            <Text style={[styles.ptsText, isMe && styles.ptsMe]}>
+              {participant.points}
             </Text>
           </View>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
-/**
- * 🎨 Estilos
- */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 15,
     backgroundColor: '#F1F5F9',
   },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 15,
+  list: {
+    padding: 16,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginBottom: 6,
+  },
+  colHash: {
+    width: 42,
+    fontWeight: '700',
+    color: '#64748B',
+    fontSize: 13,
+  },
+  colName: {
+    flex: 1,
+    fontWeight: '700',
+    color: '#64748B',
+    fontSize: 13,
+  },
+  colPts: {
+    fontWeight: '700',
+    color: '#64748B',
+    fontSize: 13,
+    width: 60,
+    textAlign: 'right',
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 15,
+    alignItems: 'center',
+    backgroundColor: 'white',
+    padding: 14,
     borderRadius: 12,
-    marginBottom: 10,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  position: {
-    fontWeight: 'bold',
-    width: 30,
-  },
-  name: {
-    flex: 1,
-  },
-  points: {
-    fontWeight: 'bold',
-  },
-  me: {
+  rowMe: {
     borderWidth: 2,
-    borderColor: '#16A34A',
+    borderColor: '#2563EB',
+  },
+  posBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  posText: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    color: '#1E293B',
+  },
+  nameText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#0F172A',
+    fontWeight: '500',
+  },
+  nameMe: {
+    color: '#2563EB',
+    fontWeight: '700',
+  },
+  ptsText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+    width: 50,
+    textAlign: 'right',
+  },
+  ptsMe: {
+    color: '#2563EB',
   },
 });
