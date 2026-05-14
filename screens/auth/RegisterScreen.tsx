@@ -7,22 +7,40 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 
 export default function RegisterScreen({ navigation }: any) {
-  const { login } = useApp();
+  const { register } = useApp();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!fullName.trim() || !email.trim() || !password.trim()) return;
-    if (password !== confirm) return;
-    login(email.trim(), fullName.trim());
+    if (password !== confirm) {
+      setError('Las contraseñas no coinciden');
+      return;
+    }
+    if (password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await register(email.trim(), password, fullName.trim());
+    } catch (e: any) {
+      setError(e.message ?? 'Error al crear la cuenta');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -49,6 +67,7 @@ export default function RegisterScreen({ navigation }: any) {
               value={fullName}
               onChangeText={setFullName}
               style={styles.input}
+              editable={!loading}
             />
 
             <Text style={styles.label}>Correo Electrónico</Text>
@@ -60,6 +79,7 @@ export default function RegisterScreen({ navigation }: any) {
               style={styles.input}
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={!loading}
             />
 
             <Text style={styles.label}>Contraseña</Text>
@@ -70,6 +90,7 @@ export default function RegisterScreen({ navigation }: any) {
               onChangeText={setPassword}
               secureTextEntry
               style={styles.input}
+              editable={!loading}
             />
 
             <Text style={styles.label}>Confirmar Contraseña</Text>
@@ -80,13 +101,23 @@ export default function RegisterScreen({ navigation }: any) {
               onChangeText={setConfirm}
               secureTextEntry
               style={styles.input}
+              editable={!loading}
             />
 
-            <TouchableOpacity style={styles.btnPrimary} onPress={handleRegister}>
-              <Text style={styles.btnPrimaryText}>Crear Cuenta</Text>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.btnPrimary, loading && styles.btnDisabled]}
+              onPress={handleRegister}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color="white" />
+                : <Text style={styles.btnPrimaryText}>Crear Cuenta</Text>
+              }
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')} disabled={loading}>
               <Text style={styles.loginLink}>
                 ¿Ya tienes cuenta?{' '}
                 <Text style={styles.loginLinkBold}>Iniciar Sesión</Text>
@@ -159,12 +190,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     marginBottom: 14,
   },
+  error: {
+    color: '#DC2626',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
   btnPrimary: {
     backgroundColor: '#16A34A',
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 18,
+  },
+  btnDisabled: {
+    opacity: 0.6,
   },
   btnPrimaryText: {
     color: 'white',

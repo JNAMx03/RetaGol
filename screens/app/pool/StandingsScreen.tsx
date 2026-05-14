@@ -1,7 +1,8 @@
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useApp } from '../../../context/AppContext';
+import { getResultType, POINTS } from '../../../utils/scoring';
 
-// Resultados simulados (luego vendrán del backend)
+// Resultados simulados (reemplazar con API real en V2)
 const MOCK_RESULTS: Record<string, { homeScore: string; awayScore: string }> = {
   ch1: { homeScore: '2', awayScore: '1' },
   ch2: { homeScore: '1', awayScore: '1' },
@@ -16,7 +17,7 @@ const MOCK_RESULTS: Record<string, { homeScore: string; awayScore: string }> = {
   c3:  { homeScore: '0', awayScore: '1' },
 };
 
-// Participantes simulados para demo (luego se leerán del backend)
+// Participantes simulados para demo (reemplazar con backend en V2)
 const MOCK_PARTICIPANTS = [
   {
     id: 'p1', name: 'John Doe',
@@ -48,16 +49,11 @@ const MOCK_PARTICIPANTS = [
 ];
 
 function calcPoints(predictions: { id: string; homeScore: string; awayScore: string }[]): number {
-  let total = 0;
-  predictions.forEach((pred) => {
+  return predictions.reduce((total, pred) => {
     const result = MOCK_RESULTS[pred.id];
-    if (!result) return;
-    const pH = Number(pred.homeScore), pA = Number(pred.awayScore);
-    const rH = Number(result.homeScore), rA = Number(result.awayScore);
-    if (pH === rH && pA === rA) total += 3;
-    else if ((pH > pA && rH > rA) || (pH < pA && rH < rA) || (pH === pA && rH === rA)) total += 1;
-  });
-  return total;
+    const type = getResultType(pred, result);
+    return total + POINTS[type];
+  }, 0);
 }
 
 const PODIUM_COLORS = ['#FACC15', '#94A3B8', '#B45309'];
@@ -71,7 +67,7 @@ export default function StandingsScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.list}>
-      {/* Encabezado de la tabla */}
+      {/* Encabezado de tabla */}
       <View style={styles.tableHeader}>
         <Text style={styles.colHash}>#</Text>
         <Text style={styles.colName}>Participante</Text>
@@ -103,13 +99,8 @@ export default function StandingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F1F5F9',
-  },
-  list: {
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: '#F1F5F9' },
+  list: { padding: 16 },
   tableHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -117,25 +108,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginBottom: 6,
   },
-  colHash: {
-    width: 42,
-    fontWeight: '700',
-    color: '#64748B',
-    fontSize: 13,
-  },
-  colName: {
-    flex: 1,
-    fontWeight: '700',
-    color: '#64748B',
-    fontSize: 13,
-  },
-  colPts: {
-    fontWeight: '700',
-    color: '#64748B',
-    fontSize: 13,
-    width: 60,
-    textAlign: 'right',
-  },
+  colHash: { width: 42, fontWeight: '700', color: '#64748B', fontSize: 13 },
+  colName: { flex: 1, fontWeight: '700', color: '#64748B', fontSize: 13 },
+  colPts: { fontWeight: '700', color: '#64748B', fontSize: 13, width: 60, textAlign: 'right' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -161,29 +136,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  posText: {
-    fontWeight: 'bold',
-    fontSize: 14,
-    color: '#1E293B',
-  },
-  nameText: {
-    flex: 1,
-    fontSize: 15,
-    color: '#0F172A',
-    fontWeight: '500',
-  },
-  nameMe: {
-    color: '#2563EB',
-    fontWeight: '700',
-  },
-  ptsText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-    width: 50,
-    textAlign: 'right',
-  },
-  ptsMe: {
-    color: '#2563EB',
-  },
+  posText: { fontWeight: 'bold', fontSize: 14, color: '#1E293B' },
+  nameText: { flex: 1, fontSize: 15, color: '#0F172A', fontWeight: '500' },
+  nameMe: { color: '#2563EB', fontWeight: '700' },
+  ptsText: { fontSize: 15, fontWeight: '700', color: '#0F172A', width: 50, textAlign: 'right' },
+  ptsMe: { color: '#2563EB' },
 });

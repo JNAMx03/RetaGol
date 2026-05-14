@@ -31,6 +31,7 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
@@ -42,5 +43,5 @@ yarn-error.*
 
 
 #claude
-CLAUDE.md
-ARQUITECTURA_RETAGOL.md
+#CLAUDE.md
+#ARQUITECTURA_RETAGOL.md

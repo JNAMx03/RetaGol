@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
@@ -42,14 +43,24 @@ export default function CreatePoolScreen({ navigation }: any) {
   const { createPool } = useApp();
   const [name, setName] = useState('');
   const [type, setType] = useState<CompetitionType>('champions');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const matches = MATCHES_BY_TYPE[type];
   const canCreate = name.trim().length > 0;
 
-  const handleCreate = () => {
-    if (!canCreate) return;
-    createPool(name.trim(), type, matches);
-    navigation.goBack();
+  const handleCreate = async () => {
+    if (!canCreate || loading) return;
+    setError('');
+    setLoading(true);
+    try {
+      await createPool(name.trim(), type, matches);
+      navigation.goBack();
+    } catch (e: any) {
+      setError(e.message ?? 'Error al crear la polla');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -112,12 +123,16 @@ export default function CreatePoolScreen({ navigation }: any) {
 
       {/* Botón crear */}
       <View style={styles.footer}>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
         <TouchableOpacity
-          style={[styles.btnCreate, !canCreate && styles.btnDisabled]}
+          style={[styles.btnCreate, (!canCreate || loading) && styles.btnDisabled]}
           onPress={handleCreate}
-          disabled={!canCreate}
+          disabled={!canCreate || loading}
         >
-          <Text style={styles.btnCreateText}>Crear Polla</Text>
+          {loading
+            ? <ActivityIndicator color="white" />
+            : <Text style={styles.btnCreateText}>Crear Polla</Text>
+          }
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -234,5 +249,11 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 15,
+  },
+  error: {
+    color: '#DC2626',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 8,
   },
 });

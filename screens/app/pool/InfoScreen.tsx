@@ -17,10 +17,13 @@ const TOURNAMENT_DESC: Record<string, string> = {
     'La Copa del Rey es el torneo de copa más importante de España, donde participan equipos de todas las divisiones del fútbol español.',
 };
 
+// Tabla de puntuación oficial según arquitectura V1
 const SCORING_RULES = [
-  { label: 'Marcador exacto', points: '3 pts', color: '#16A34A' },
-  { label: 'Ganador o empate correcto', points: '1 pt', color: '#EAB308' },
-  { label: 'Resultado incorrecto', points: '0 pts', color: '#DC2626' },
+  { label: 'Marcador exacto', points: '5 pts', color: '#16A34A' },
+  { label: 'Un marcador exacto (local o visitante)', points: '2 pts', color: '#2563EB' },
+  { label: 'Ganador / empate correcto', points: '1 pt', color: '#EAB308' },
+  { label: 'Diferencia de goles correcta', points: '1 pt', color: '#EAB308' },
+  { label: 'Sin acierto', points: '0 pts', color: '#DC2626' },
 ];
 
 export default function InfoScreen({ route }: any) {
@@ -69,6 +72,10 @@ export default function InfoScreen({ route }: any) {
                 <Text style={[styles.scoringPts, { color: rule.color }]}>{rule.points}</Text>
               </View>
             ))}
+            <Text style={styles.scoringNote}>
+              * Los puntos son excluyentes: se aplica solo el acierto de mayor valor.
+              En futuras versiones el creador podrá personalizar estos valores.
+            </Text>
           </View>
         )}
       </View>
@@ -99,13 +106,8 @@ function InfoRow({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F1F5F9',
-  },
-  list: {
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: '#F1F5F9' },
+  list: { padding: 16 },
   section: {
     backgroundColor: 'white',
     borderRadius: 14,
@@ -129,41 +131,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 9,
   },
-  infoLabel: {
-    color: '#64748B',
-    fontSize: 14,
-  },
-  infoValue: {
-    fontWeight: '600',
-    color: '#0F172A',
-    fontSize: 14,
-  },
-  code: {
-    color: '#2563EB',
-    letterSpacing: 1.5,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#F1F5F9',
-  },
-  description: {
-    color: '#64748B',
-    lineHeight: 22,
-    fontSize: 14,
-  },
+  infoLabel: { color: '#64748B', fontSize: 14 },
+  infoValue: { fontWeight: '600', color: '#0F172A', fontSize: 14 },
+  code: { color: '#2563EB', letterSpacing: 1.5 },
+  divider: { height: 1, backgroundColor: '#F1F5F9' },
+  description: { color: '#64748B', lineHeight: 22, fontSize: 14 },
   accordionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 0,
   },
-  chevron: {
-    color: '#64748B',
-    fontSize: 13,
-  },
-  scoringList: {
-    marginTop: 12,
-  },
+  chevron: { color: '#64748B', fontSize: 13 },
+  scoringList: { marginTop: 12 },
   scoringRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -177,13 +157,13 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginRight: 10,
   },
-  scoringLabel: {
-    flex: 1,
-    color: '#374151',
-    fontSize: 14,
-  },
-  scoringPts: {
-    fontWeight: '700',
-    fontSize: 14,
+  scoringLabel: { flex: 1, color: '#374151', fontSize: 13 },
+  scoringPts: { fontWeight: '700', fontSize: 13 },
+  scoringNote: {
+    marginTop: 12,
+    fontSize: 11,
+    color: '#94A3B8',
+    lineHeight: 16,
+    fontStyle: 'italic',
   },
 });

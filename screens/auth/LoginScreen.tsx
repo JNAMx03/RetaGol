@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
@@ -16,12 +17,20 @@ export default function LoginScreen({ navigation }: any) {
   const { login } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email.trim() || !password.trim()) return;
-    const raw = email.split('@')[0].replace(/[^a-zA-Z]/g, ' ').trim();
-    const name = raw.charAt(0).toUpperCase() + raw.slice(1) || 'Usuario';
-    login(email.trim(), name);
+    setError('');
+    setLoading(true);
+    try {
+      await login(email.trim(), password);
+    } catch (e: any) {
+      setError(e.message ?? 'Error al iniciar sesión');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -52,6 +61,7 @@ export default function LoginScreen({ navigation }: any) {
               style={styles.input}
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={!loading}
             />
 
             <Text style={styles.label}>Contraseña</Text>
@@ -62,14 +72,24 @@ export default function LoginScreen({ navigation }: any) {
               onChangeText={setPassword}
               secureTextEntry
               style={styles.input}
+              editable={!loading}
             />
 
             <TouchableOpacity>
               <Text style={styles.forgot}>¿Olvidaste tu contraseña?</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.btnPrimary} onPress={handleLogin}>
-              <Text style={styles.btnPrimaryText}>Iniciar Sesión</Text>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.btnPrimary, loading && styles.btnDisabled]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color="white" />
+                : <Text style={styles.btnPrimaryText}>Iniciar Sesión</Text>
+              }
             </TouchableOpacity>
 
             <Text style={styles.noAccount}>¿No tienes cuenta?</Text>
@@ -77,6 +97,7 @@ export default function LoginScreen({ navigation }: any) {
             <TouchableOpacity
               style={styles.btnSecondary}
               onPress={() => navigation.navigate('Register')}
+              disabled={loading}
             >
               <Text style={styles.btnSecondaryText}>Crear Cuenta</Text>
             </TouchableOpacity>
@@ -160,12 +181,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 22,
   },
+  error: {
+    color: '#DC2626',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
   btnPrimary: {
     backgroundColor: '#2563EB',
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 14,
+  },
+  btnDisabled: {
+    opacity: 0.6,
   },
   btnPrimaryText: {
     color: 'white',

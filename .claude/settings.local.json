@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"require\\('@expo/vector-icons'\\); console.log\\('OK'\\)\")",
+      "PowerShell(Get-ChildItem \"d:\\\\Projects\\\\RetaGol\" | Where-Object {$_.Extension -eq \".md\"} | Select-Object Name)"
+    ]
+  }
+}

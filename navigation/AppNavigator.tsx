@@ -27,11 +27,13 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!isLogged ? (
+          // ── Flujo de autenticación ──────────────────────────────
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
           </>
         ) : (
+          // ── Flujo principal ─────────────────────────────────────
           <>
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="CreatePool" component={CreatePoolScreen} />

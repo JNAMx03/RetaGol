@@ -1,7 +1,8 @@
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useApp, Match } from '../../../context/AppContext';
+import { getResultType, POINTS, BADGE_COLORS, BADGE_LABELS } from '../../../utils/scoring';
 
-// Resultados simulados por ID de partido (luego vendrán del backend)
+// Resultados simulados por ID de partido (reemplazar con API real en V2)
 const MOCK_RESULTS: Record<string, { homeScore: string; awayScore: string }> = {
   ch1: { homeScore: '2', awayScore: '1' },
   ch2: { homeScore: '1', awayScore: '1' },
@@ -14,28 +15,6 @@ const MOCK_RESULTS: Record<string, { homeScore: string; awayScore: string }> = {
   c1:  { homeScore: '2', awayScore: '0' },
   c2:  { homeScore: '1', awayScore: '1' },
   c3:  { homeScore: '0', awayScore: '1' },
-};
-
-type ResultType = 'exact' | 'winner' | 'fail' | 'none';
-
-function getResultType(pred: Match | undefined, result: { homeScore: string; awayScore: string } | undefined): ResultType {
-  if (!pred || pred.homeScore === '' || pred.awayScore === '') return 'none';
-  if (!result) return 'none';
-
-  const pH = Number(pred.homeScore), pA = Number(pred.awayScore);
-  const rH = Number(result.homeScore), rA = Number(result.awayScore);
-
-  if (pH === rH && pA === rA) return 'exact';
-  if ((pH > pA && rH > rA) || (pH < pA && rH < rA) || (pH === pA && rH === rA)) return 'winner';
-  return 'fail';
-}
-
-const POINTS: Record<ResultType, number> = { exact: 3, winner: 1, fail: 0, none: 0 };
-const COLORS: Record<ResultType, string> = {
-  exact: '#16A34A',
-  winner: '#EAB308',
-  fail: '#DC2626',
-  none: '#94A3B8',
 };
 
 export default function ResultsScreen({ route }: any) {
@@ -51,8 +30,9 @@ export default function ResultsScreen({ route }: any) {
         const result = MOCK_RESULTS[match.id];
         const type = getResultType(pred, result);
         const points = POINTS[type];
-        const color = COLORS[type];
-        const hasFinalScore = !!result;
+        const badgeColor = BADGE_COLORS[type];
+        const badgeLabel = BADGE_LABELS[type];
+        const hasResult = !!result;
 
         return (
           <View key={match.id} style={styles.card}>
@@ -60,9 +40,9 @@ export default function ResultsScreen({ route }: any) {
 
             <View style={styles.resultRow}>
               <View style={styles.matchInfo}>
-                {hasFinalScore ? (
+                {hasResult ? (
                   <Text style={styles.matchTitle}>
-                    {match.home} {result!.homeScore} - {result!.awayScore} {match.away}
+                    {match.home} {result!.homeScore} – {result!.awayScore} {match.away}
                   </Text>
                 ) : (
                   <Text style={styles.matchTitle}>
@@ -72,14 +52,21 @@ export default function ResultsScreen({ route }: any) {
 
                 <Text style={styles.prediction}>
                   Tu predicción:{' '}
-                  {pred ? `${pred.homeScore || '-'} - ${pred.awayScore || '-'}` : 'Sin predicción'}
+                  {pred
+                    ? `${pred.homeScore || '?'} – ${pred.awayScore || '?'}`
+                    : 'Sin predicción'}
                 </Text>
               </View>
 
-              <View style={[styles.badge, { backgroundColor: color }]}>
-                <Text style={styles.badgeText}>
-                  {hasFinalScore ? `${points} pt${points !== 1 ? 's' : ''}` : '—'}
-                </Text>
+              <View style={[styles.badge, { backgroundColor: hasResult ? badgeColor : '#E2E8F0' }]}>
+                {hasResult ? (
+                  <>
+                    <Text style={styles.badgePts}>{points} pt{points !== 1 ? 's' : ''}</Text>
+                    <Text style={styles.badgeLabel}>{badgeLabel}</Text>
+                  </>
+                ) : (
+                  <Text style={styles.badgePending}>Pdte.</Text>
+                )}
               </View>
             </View>
           </View>
@@ -90,13 +77,8 @@ export default function ResultsScreen({ route }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F1F5F9',
-  },
-  list: {
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: '#F1F5F9' },
+  list: { padding: 16 },
   card: {
     backgroundColor: 'white',
     padding: 16,
@@ -108,40 +90,37 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  date: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginBottom: 10,
-  },
+  date: { fontSize: 12, color: '#94A3B8', marginBottom: 10 },
   resultRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  matchInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
+  matchInfo: { flex: 1, marginRight: 12 },
   matchTitle: {
     fontWeight: '700',
     color: '#0F172A',
     fontSize: 14,
-    marginBottom: 4,
+    marginBottom: 5,
   },
-  prediction: {
-    color: '#64748B',
-    fontSize: 13,
-  },
+  prediction: { color: '#64748B', fontSize: 13 },
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 20,
-    minWidth: 54,
+    minWidth: 58,
     alignItems: 'center',
   },
-  badgeText: {
+  badgePts: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 13,
+    lineHeight: 16,
   },
+  badgeLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 9,
+    lineHeight: 12,
+  },
+  badgePending: { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
 });
