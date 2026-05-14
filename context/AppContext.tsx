@@ -39,9 +39,10 @@ interface AppContextType {
   logout: () => Promise<void>;
   pools: Pool[];
   createPool: (name: string, type: CompetitionType, matches: Match[]) => Promise<void>;
+  joinPool: (code: string) => Promise<Pool>;
   predictions: Record<string, Record<string, Match[]>>;
   getPredictionsByPool: (poolId: string) => Match[];
-  savePredictionsByPool: (poolId: string, matches: Match[]) => void;
+  savePredictionsByPool: (poolId: string, matches: Match[]) => Promise<void>;
   clearAllData: () => Promise<void>;
   loading: boolean;
 }
@@ -101,9 +102,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // Predicciones aún en local (se migran en Fase 3.4)
-        const storedPredictions = await AsyncStorage.getItem('predictions');
-        if (storedPredictions) setPredictions(JSON.parse(storedPredictions));
+        // Predicciones en Supabase desde Fase 3.4 — ya no se persisten localmente
       } catch (e) {
         console.log('Error al iniciar:', e);
       } finally {
@@ -113,12 +112,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     loadData();
   }, []);
 
-  // Persistir predicciones automáticamente (temporal hasta Fase 3.4)
-  useEffect(() => {
-    if (!loading) {
-      AsyncStorage.setItem('predictions', JSON.stringify(predictions)).catch(console.log);
-    }
-  }, [predictions, loading]);
 
   const loadPoolsForUser = async (userId: string) => {
     const { data, error } = await supabase
@@ -219,20 +212,74 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPools((prev) => [...prev, newPool]);
   };
 
+  const joinPool = async (code: string): Promise<Pool> => {
+    if (!user) throw new Error('No hay sesión activa');
+
+    // 1. Buscar la polla por código
+    const { data: pool, error: poolError } = await supabase
+      .from('pools')
+      .select('*, matches(*)')
+      .eq('code', code.trim().toUpperCase())
+      .single();
+
+    if (poolError || !pool) throw new Error('No se encontró ninguna polla con ese código.');
+
+    // 2. Verificar si ya es participante
+    const { data: existing } = await supabase
+      .from('pool_participants')
+      .select('user_id')
+      .eq('pool_id', pool.id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (existing) throw new Error('YA_PARTICIPANTE');
+
+    // 3. Registrar participante y actualizar contador
+    const { error: joinError } = await supabase
+      .from('pool_participants')
+      .insert({ pool_id: pool.id, user_id: user.id });
+
+    if (joinError) throw joinError;
+
+    await supabase
+      .from('pools')
+      .update({ participants: pool.participants + 1 })
+      .eq('id', pool.id);
+
+    // 4. Construir objeto Pool y actualizar estado
+    const newPool = mapPool({ ...pool, participants: pool.participants + 1 }, pool.matches ?? []);
+    setPools((prev) => [...prev, newPool]);
+
+    return newPool;
+  };
+
   // ─── Predicciones ───────────────────────────────────────────────────────────
 
   const getPredictionsByPool = (poolId: string): Match[] => {
     return predictions[poolId]?.[user?.id ?? ''] || [];
   };
 
-  const savePredictionsByPool = (poolId: string, matches: Match[]) => {
+  const savePredictionsByPool = async (poolId: string, matches: Match[]) => {
     if (!user) return;
+
+    const rows = matches.map((m) => ({
+      pool_id: poolId,
+      match_id: m.id,
+      user_id: user.id,
+      home_score: m.homeScore,
+      away_score: m.awayScore,
+    }));
+
+    const { error } = await supabase
+      .from('predictions')
+      .upsert(rows, { onConflict: 'pool_id,match_id,user_id' });
+
+    if (error) throw error;
+
+    // Actualizar caché local
     setPredictions((prev) => ({
       ...prev,
-      [poolId]: {
-        ...prev[poolId],
-        [user.id]: matches,
-      },
+      [poolId]: { ...prev[poolId], [user.id]: matches },
     }));
   };
 
@@ -261,6 +308,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         logout,
         pools,
         createPool,
+        joinPool,
         predictions,
         getPredictionsByPool,
         savePredictionsByPool,

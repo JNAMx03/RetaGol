@@ -1,73 +1,86 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { useState, useEffect } from 'react';
 import { useApp } from '../../../context/AppContext';
+import { supabase } from '../../../services/supabase';
 import { getResultType, POINTS } from '../../../utils/scoring';
 
-// Resultados simulados (reemplazar con API real en V2)
-const MOCK_RESULTS: Record<string, { homeScore: string; awayScore: string }> = {
-  ch1: { homeScore: '2', awayScore: '1' },
-  ch2: { homeScore: '1', awayScore: '1' },
-  ch3: { homeScore: '3', awayScore: '2' },
-  ch4: { homeScore: '0', awayScore: '2' },
-  l1:  { homeScore: '1', awayScore: '2' },
-  l2:  { homeScore: '0', awayScore: '0' },
-  l3:  { homeScore: '2', awayScore: '1' },
-  l4:  { homeScore: '3', awayScore: '0' },
-  c1:  { homeScore: '2', awayScore: '0' },
-  c2:  { homeScore: '1', awayScore: '1' },
-  c3:  { homeScore: '0', awayScore: '1' },
-};
-
-// Participantes simulados para demo (reemplazar con backend en V2)
-const MOCK_PARTICIPANTS = [
-  {
-    id: 'p1', name: 'John Doe',
-    predictions: [
-      { id: 'ch1', homeScore: '2', awayScore: '8' },
-      { id: 'ch2', homeScore: '2', awayScore: '0' },
-      { id: 'ch3', homeScore: '3', awayScore: '2' },
-      { id: 'ch4', homeScore: '0', awayScore: '2' },
-    ],
-  },
-  {
-    id: 'p2', name: 'Jane Smith',
-    predictions: [
-      { id: 'ch1', homeScore: '1', awayScore: '0' },
-      { id: 'ch2', homeScore: '1', awayScore: '1' },
-      { id: 'ch3', homeScore: '3', awayScore: '1' },
-      { id: 'ch4', homeScore: '1', awayScore: '2' },
-    ],
-  },
-  {
-    id: 'p3', name: 'Mike Johnson',
-    predictions: [
-      { id: 'ch1', homeScore: '2', awayScore: '1' },
-      { id: 'ch2', homeScore: '0', awayScore: '0' },
-      { id: 'ch3', homeScore: '2', awayScore: '2' },
-      { id: 'ch4', homeScore: '0', awayScore: '3' },
-    ],
-  },
-];
-
-function calcPoints(predictions: { id: string; homeScore: string; awayScore: string }[]): number {
-  return predictions.reduce((total, pred) => {
-    const result = MOCK_RESULTS[pred.id];
-    const type = getResultType(pred, result);
-    return total + POINTS[type];
-  }, 0);
+interface Participant {
+  id: string;
+  name: string;
+  points: number;
 }
 
 const PODIUM_COLORS = ['#FACC15', '#94A3B8', '#B45309'];
 
-export default function StandingsScreen() {
+export default function StandingsScreen({ route }: any) {
+  const { pool } = route.params;
   const { user } = useApp();
+  const [ranking, setRanking] = useState<Participant[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const ranking = MOCK_PARTICIPANTS
-    .map((p) => ({ ...p, points: calcPoints(p.predictions) }))
-    .sort((a, b) => b.points - a.points);
+  useEffect(() => {
+    const fetchStandings = async () => {
+      try {
+        // Cargar participantes con su nombre de perfil
+        const { data: participants, error: pError } = await supabase
+          .from('pool_participants')
+          .select('user_id, profiles(name)')
+          .eq('pool_id', pool.id);
+
+        if (pError || !participants) return;
+
+        // Cargar todas las predicciones de la polla
+        const { data: allPreds, error: predError } = await supabase
+          .from('predictions')
+          .select('user_id, match_id, home_score, away_score')
+          .eq('pool_id', pool.id);
+
+        if (predError) return;
+
+        // Calcular puntos por participante
+        const calculated: Participant[] = participants.map((p: any) => {
+          const userPreds = (allPreds ?? []).filter((pr) => pr.user_id === p.user_id);
+
+          const points = (pool.matches ?? []).reduce((total: number, match: any) => {
+            if (match.homeScore === '' || match.awayScore === '') return total;
+
+            const pred = userPreds.find((pr) => pr.match_id === match.id);
+            if (!pred) return total;
+
+            const type = getResultType(
+              { homeScore: pred.home_score, awayScore: pred.away_score },
+              { homeScore: match.homeScore, awayScore: match.awayScore },
+            );
+            return total + POINTS[type];
+          }, 0);
+
+          return {
+            id: p.user_id,
+            name: p.profiles?.name ?? 'Usuario',
+            points,
+          };
+        });
+
+        setRanking(calculated.sort((a, b) => b.points - a.points));
+      } catch (e) {
+        console.log('Error cargando clasificación:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStandings();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.list}>
-      {/* Encabezado de tabla */}
       <View style={styles.tableHeader}>
         <Text style={styles.colHash}>#</Text>
         <Text style={styles.colName}>Participante</Text>
@@ -75,7 +88,7 @@ export default function StandingsScreen() {
       </View>
 
       {ranking.map((participant, index) => {
-        const isMe = participant.name === user.name;
+        const isMe = participant.id === user?.id;
         const badgeColor = PODIUM_COLORS[index] ?? '#E2E8F0';
 
         return (
@@ -100,6 +113,7 @@ export default function StandingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F1F5F9' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F5F9' },
   list: { padding: 16 },
   tableHeader: {
     flexDirection: 'row',
@@ -124,10 +138,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  rowMe: {
-    borderWidth: 2,
-    borderColor: '#2563EB',
-  },
+  rowMe: { borderWidth: 2, borderColor: '#2563EB' },
   posBadge: {
     width: 30,
     height: 30,

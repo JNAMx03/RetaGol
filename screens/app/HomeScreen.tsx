@@ -40,7 +40,7 @@ export default function HomeScreen({ navigation }: any) {
   const translateX = useRef(new Animated.Value(-MENU_WIDTH)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
-  const initials = user.name
+  const initials = (user?.name ?? 'U')
     .split(' ')
     .map((n) => n[0])
     .join('')
@@ -154,9 +154,9 @@ export default function HomeScreen({ navigation }: any) {
             <View style={styles.menuAvatar}>
               <Text style={styles.menuAvatarText}>{initials}</Text>
             </View>
-            <Text style={styles.menuUserName}>{user.name}</Text>
+            <Text style={styles.menuUserName}>{user?.name ?? ''}</Text>
             <Text style={styles.menuUserEmail}>
-              {user.email || 'sin correo configurado'}
+              {user?.email || 'sin correo configurado'}
             </Text>
           </View>
 

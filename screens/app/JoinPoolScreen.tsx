@@ -4,17 +4,38 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
+import { useApp } from '../../context/AppContext';
 
 export default function JoinPoolScreen({ navigation }: any) {
+  const { joinPool } = useApp();
   const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const canJoin = code.trim().length > 0;
 
-  const handleJoin = () => {
-    // TODO: validar código contra el backend y unirse a la polla
+  const handleJoin = async () => {
+    if (!canJoin || loading) return;
+    setError('');
+    setLoading(true);
+    try {
+      const pool = await joinPool(code.trim());
+      navigation.replace('PoolDetail', { pool });
+    } catch (e: any) {
+      if (e.message === 'YA_PARTICIPANTE') {
+        Alert.alert('Ya estás en esta polla', 'Puedes verla en tu pantalla principal.');
+        navigation.goBack();
+      } else {
+        setError(e.message ?? 'Error al unirse a la polla');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -29,7 +50,6 @@ export default function JoinPoolScreen({ navigation }: any) {
       </View>
 
       <View style={styles.content}>
-        {/* Ícono "+" */}
         <View style={styles.plusCircle}>
           <Text style={styles.plusIcon}>+</Text>
         </View>
@@ -43,18 +63,24 @@ export default function JoinPoolScreen({ navigation }: any) {
           placeholder="Ej. CH2026"
           placeholderTextColor="#94A3B8"
           value={code}
-          onChangeText={(t) => setCode(t.toUpperCase())}
+          onChangeText={(t) => { setCode(t.toUpperCase()); setError(''); }}
           style={styles.input}
           autoCapitalize="characters"
           maxLength={8}
+          editable={!loading}
         />
 
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
         <TouchableOpacity
-          style={[styles.btn, !canJoin && styles.btnDisabled]}
+          style={[styles.btn, (!canJoin || loading) && styles.btnDisabled]}
           onPress={handleJoin}
-          disabled={!canJoin}
+          disabled={!canJoin || loading}
         >
-          <Text style={styles.btnText}>Unirse</Text>
+          {loading
+            ? <ActivityIndicator color="white" />
+            : <Text style={styles.btnText}>Unirse</Text>
+          }
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -143,6 +169,13 @@ const styles = StyleSheet.create({
     width: '100%',
     textAlign: 'center',
     letterSpacing: 3,
+  },
+  error: {
+    color: '#DC2626',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 12,
+    width: '100%',
   },
   btn: {
     backgroundColor: '#2563EB',

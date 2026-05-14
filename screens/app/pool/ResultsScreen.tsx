@@ -1,38 +1,60 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { useState, useEffect } from 'react';
 import { useApp, Match } from '../../../context/AppContext';
+import { supabase } from '../../../services/supabase';
 import { getResultType, POINTS, BADGE_COLORS, BADGE_LABELS } from '../../../utils/scoring';
-
-// Resultados simulados por ID de partido (reemplazar con API real en V2)
-const MOCK_RESULTS: Record<string, { homeScore: string; awayScore: string }> = {
-  ch1: { homeScore: '2', awayScore: '1' },
-  ch2: { homeScore: '1', awayScore: '1' },
-  ch3: { homeScore: '3', awayScore: '2' },
-  ch4: { homeScore: '0', awayScore: '2' },
-  l1:  { homeScore: '1', awayScore: '2' },
-  l2:  { homeScore: '0', awayScore: '0' },
-  l3:  { homeScore: '2', awayScore: '1' },
-  l4:  { homeScore: '3', awayScore: '0' },
-  c1:  { homeScore: '2', awayScore: '0' },
-  c2:  { homeScore: '1', awayScore: '1' },
-  c3:  { homeScore: '0', awayScore: '1' },
-};
 
 export default function ResultsScreen({ route }: any) {
   const { pool } = route.params;
-  const { getPredictionsByPool } = useApp();
-  const predictions = getPredictionsByPool(pool.id);
+  const { user } = useApp();
   const matches: Match[] = pool.matches ?? [];
+
+  const [predictions, setPredictions] = useState<Record<string, { homeScore: string; awayScore: string }>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPredictions = async () => {
+      try {
+        const { data } = await supabase
+          .from('predictions')
+          .select('match_id, home_score, away_score')
+          .eq('pool_id', pool.id)
+          .eq('user_id', user?.id ?? '');
+
+        if (data) {
+          const map: Record<string, { homeScore: string; awayScore: string }> = {};
+          data.forEach((p) => {
+            map[p.match_id] = { homeScore: p.home_score ?? '', awayScore: p.away_score ?? '' };
+          });
+          setPredictions(map);
+        }
+      } catch (e) {
+        console.log('Error cargando resultados:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPredictions();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.list}>
       {matches.map((match) => {
-        const pred = predictions.find((p) => p.id === match.id);
-        const result = MOCK_RESULTS[match.id];
+        const pred = predictions[match.id];
+        const hasResult = match.homeScore !== '' && match.awayScore !== '';
+        const result = hasResult ? { homeScore: match.homeScore, awayScore: match.awayScore } : undefined;
         const type = getResultType(pred, result);
         const points = POINTS[type];
         const badgeColor = BADGE_COLORS[type];
         const badgeLabel = BADGE_LABELS[type];
-        const hasResult = !!result;
 
         return (
           <View key={match.id} style={styles.card}>
@@ -42,7 +64,7 @@ export default function ResultsScreen({ route }: any) {
               <View style={styles.matchInfo}>
                 {hasResult ? (
                   <Text style={styles.matchTitle}>
-                    {match.home} {result!.homeScore} – {result!.awayScore} {match.away}
+                    {match.home} {match.homeScore} – {match.awayScore} {match.away}
                   </Text>
                 ) : (
                   <Text style={styles.matchTitle}>
@@ -78,6 +100,7 @@ export default function ResultsScreen({ route }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F1F5F9' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F5F9' },
   list: { padding: 16 },
   card: {
     backgroundColor: 'white',
@@ -97,12 +120,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   matchInfo: { flex: 1, marginRight: 12 },
-  matchTitle: {
-    fontWeight: '700',
-    color: '#0F172A',
-    fontSize: 14,
-    marginBottom: 5,
-  },
+  matchTitle: { fontWeight: '700', color: '#0F172A', fontSize: 14, marginBottom: 5 },
   prediction: { color: '#64748B', fontSize: 13 },
   badge: {
     paddingHorizontal: 10,
@@ -111,16 +129,7 @@ const styles = StyleSheet.create({
     minWidth: 58,
     alignItems: 'center',
   },
-  badgePts: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 13,
-    lineHeight: 16,
-  },
-  badgeLabel: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 9,
-    lineHeight: 12,
-  },
+  badgePts: { color: 'white', fontWeight: 'bold', fontSize: 13, lineHeight: 16 },
+  badgeLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 9, lineHeight: 12 },
   badgePending: { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
 });
