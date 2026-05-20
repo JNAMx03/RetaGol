@@ -1,7 +1,7 @@
-# QuiniPolla — Documento de Arquitectura y Hoja de Ruta
-**Versión del documento:** 1.0  
+# RetaGol — Documento de Arquitectura y Hoja de Ruta
+**Versión del documento:** 1.1  
 **Fecha:** Mayo 2026  
-**Autor:** Arquitecto de Software Senior
+**Última actualización:** Mayo 2026 — V1 MVP implementado con Supabase + football-data.org
 
 ---
 
@@ -52,13 +52,13 @@ Plataforma social de quinielas deportivas que combina predicciones de partidos, 
 > - Cuando crezcas y necesites más control, puedes migrar a Azure fácilmente
 
 ### Servicios Externos
-| Servicio | Rol |
-|---|---|
-| **API-Football** (RapidAPI) | Datos de partidos, ligas, marcadores en vivo |
-| **Wompi / Stripe** | Pagos (Wompi para Colombia, Stripe para internacionalización) |
-| **OneSignal** | Notificaciones push |
-| **Sentry** | Monitoreo de errores |
-| **Expo EAS** | Build y distribución de la app |
+| Servicio | Rol | Estado |
+|---|---|---|
+| **football-data.org** | Datos de partidos, ligas, fixtures — plan gratuito, cubre temporada actual | ✅ V1 activo |
+| **Wompi / Stripe** | Pagos (Wompi para Colombia, Stripe para internacionalización) | V2.0 |
+| **OneSignal** | Notificaciones push | V1 pendiente (Fase 3C) |
+| **Sentry** | Monitoreo de errores | V1 pendiente |
+| **Expo EAS** | Build y distribución de la app | V1 pendiente (Fase 5) |
 
 ---
 
@@ -162,97 +162,79 @@ quinipolla/
 
 ## 4. MODELO DE DATOS (Base de Datos)
 
-### Tablas principales
+### Tablas V1 — Implementadas en Supabase
 
 ```sql
--- Usuarios
-users (
-  id, email, username, full_name, avatar_url,
-  country, city, balance_coins, created_at
+-- Perfiles de usuario (sincronizado con Supabase Auth vía trigger)
+profiles (
+  id uuid references auth.users primary key,
+  name text,
+  email text,
+  avatar_url text,
+  created_at timestamptz
 )
 
--- Pollas (Quinielas)
+-- Pollas
 pools (
-  id, creator_id, name, description, competition_id,
-  type (classic|advanced), status (draft|open|active|finished),
-  visibility (public|private), invite_code,
-  entry_fee, prize_distribution (jsonb),
-  scoring_config (jsonb), joker_config (jsonb),
-  max_participants, created_at, starts_at, ends_at
+  id uuid primary key,
+  name text,
+  type text,                          -- código del torneo (ej: 'WC', 'CL', 'PD')
+  code text unique,                   -- código de invitación (ej: 'L4521')
+  creator_id uuid references profiles,
+  participants int default 1,
+  status text default 'active',       -- 'active' | 'finished'
+  scoring_config jsonb,               -- { exact, oneTeam, winner, goalDiff }
+  created_at timestamptz
 )
 
 -- Participantes de una polla
 pool_participants (
-  id, pool_id, user_id, status (pending|active|rejected),
-  total_points, rank, paid_at, joined_at
+  pool_id uuid references pools,
+  user_id uuid references profiles,
+  joined_at timestamptz,
+  primary key (pool_id, user_id)
 )
 
--- Competiciones (ligas, torneos)
-competitions (
-  id, name, country, season, logo_url, api_id
-)
-
--- Partidos
+-- Partidos de una polla
 matches (
-  id, competition_id, home_team, away_team,
-  home_score, away_score, status, kickoff_at,
-  api_id, extra_stats (jsonb)
+  id text primary key,                -- '{pool_id}_{api_id}'
+  pool_id uuid references pools,
+  home text,
+  away text,
+  date text,                          -- formateado para mostrar en UI
+  home_score text,                    -- null hasta que termine el partido
+  away_score text,
+  api_id int,                         -- ID real de football-data.org (para sync-results)
+  created_at timestamptz
 )
 
--- Partidos dentro de una polla
-pool_matches (
-  id, pool_id, match_id, order_index,
-  prediction_deadline
-)
-
--- Predicciones del usuario
+-- Predicciones
 predictions (
-  id, pool_match_id, user_id,
-  predicted_home, predicted_away,
-  extra_predictions (jsonb),
-  points_earned, joker_used, submitted_at
+  id uuid primary key,
+  pool_id uuid references pools,
+  match_id text references matches,
+  user_id uuid references profiles,
+  home_score text,
+  away_score text,
+  submitted_at timestamptz,
+  unique (pool_id, match_id, user_id)
 )
+```
 
--- Comodines
-jokers (
-  id, name, description, type, cost_coins, effect (jsonb)
-)
+### Tablas V1.5 — Planificadas (ver `V1_5_PLAN.md`)
 
--- Inventario de comodines del usuario
-user_jokers (
-  id, user_id, joker_id, quantity, acquired_at
-)
+```sql
+-- Amistades, chat de polla, logros disponibles, logros de usuario
+-- Columnas adicionales en pools: visibility ('public'|'private'), invite_token
+-- Columnas adicionales en profiles: username (único)
+```
 
--- Notificaciones
-notifications (
-  id, user_id, type, title, body, data (jsonb),
-  read, created_at
-)
+### Tablas V2.0+ — Planificadas (ver `V2_0_PLAN.md`)
 
--- Logros
-achievements (
-  id, name, description, icon, condition (jsonb)
-)
-
-user_achievements (
-  id, user_id, achievement_id, earned_at
-)
-
--- Amistades
-friendships (
-  id, requester_id, addressee_id, status (pending|accepted), created_at
-)
-
--- Chat de polla
-pool_messages (
-  id, pool_id, user_id, content, created_at
-)
-
--- Transacciones
-transactions (
-  id, user_id, type (deposit|withdrawal|pool_entry|prize),
-  amount, currency, status, reference, created_at
-)
+```sql
+-- Comodines (jokers), inventario, transacciones, notificaciones
+-- Columnas adicionales en pools: entry_fee, prize_distribution
+-- Columnas adicionales en pool_participants: total_points, rank, paid_at
 ```
 
 ---
@@ -300,22 +282,32 @@ Stack (raíz)
             └── Info
 ```
 
-#### Funcionalidades V1
-- Registro e inicio de sesión (email + contraseña)
-- Crear polla clásica (solo marcador) con partidos de una liga/copa/champions
-- Ver pollas en las que participo
-- Ingresar predicciones antes del tiempo límite
-- Ver resultados y puntajes automáticamente calculados
-- Clasificación dentro de la polla
-- Perfil de usuario y configuración en menú lateral
-- Notificaciones básicas (invitación recibida, partido próximo)
+#### Funcionalidades V1 — Estado de implementación
+
+| Funcionalidad | Estado |
+|---|---|
+| Registro e inicio de sesión (email + contraseña, Supabase Auth) | ✅ |
+| Crear polla seleccionando torneo de football-data.org (solo no iniciados) | ✅ |
+| Partidos guardados automáticamente con `api_id` real | ✅ |
+| Puntajes configurables por polla (4 criterios editables) | ✅ guardado en DB |
+| Edge Function `sync-results` para actualizar marcadores automáticamente | ✅ desplegada |
+| Pull-to-refresh en Resultados activa la sincronización | ✅ |
+| Ver pollas en las que participo | ✅ |
+| Ingresar predicciones (upsert en Supabase) | ✅ |
+| Ver resultados y puntajes calculados en cliente | ✅ |
+| Clasificación interna con datos reales de Supabase | ✅ |
+| Perfil de usuario en menú lateral | ✅ |
+| Resultados/Clasificación respetan scoring configurable de la polla | ⚠️ pendiente |
+| Notificaciones push (OneSignal) | ❌ Fase 3C |
+| Build y publicación (EAS) | ❌ Fase 5 |
 
 #### Lo que NO tiene V1
 - Bottom tabs (hay un solo Home con menú lateral)
 - Pagos reales
 - Comodines
 - Chat
-- Pollas públicas/explorar (V1.5)
+- Pollas públicas / sección Explorar (V1.5)
+- Pollas Relámpago con partidos a la carta de varias ligas (V1.5)
 - Ranking global (V2.5)
 - Logros (V1.5)
 
@@ -403,25 +395,51 @@ Stack (raíz)
 
 ## 8. FLUJO DE CREACIÓN DE UNA POLLA
 
+### V1 — Polla por Torneo (MVP)
+
+El usuario selecciona un torneo completo. La app muestra **solo torneos que aún no han comenzado y tienen fixtures confirmados**. Al seleccionar uno, se muestran datos básicos (total de partidos y fecha de inicio) — no la lista completa. Los partidos se guardan en la BD con su `api_id` real para sincronización automática de resultados.
+
 ```
 1. Usuario toca "Crear Polla"
-2. Selecciona tipo: Clásica / Avanzada
-3. Selecciona fuente de partidos:
-     a. Por competición completa (ej. Liga BetPlay jornada 15)
-     b. Partidos a la carta (escoge de varias ligas)
-4. Configura:
-     - Nombre y descripción
-     - Visibilidad (Pública / Privada)
-     - Entrada (gratis / con pago)
-     - Distribución de premios (% por posición)
-     - Puntajes por tipo de acierto
-     - Comodines permitidos (sí/no)
-     - Máximo de participantes
-     - Fecha límite de predicciones
-5. Paga para crear (en versión 2.0+)
-6. Recibe código/link de invitación
-7. La polla queda visible (si es pública) o solo por código (si es privada)
+2. Escribe el nombre de la polla
+3. Ve la lista de torneos disponibles:
+     - Solo torneos con startDate > hoy (no iniciados)
+     - Solo torneos con fixtures confirmados en la API
+     - Ejemplos: Mundial 2026, próxima Champions, etc.
+4. Selecciona un torneo → ve resumen del torneo:
+     - Total de partidos programados
+     - Fecha de inicio del torneo
+     - (No se muestra la lista completa de partidos)
+5. Configura los puntajes de la polla:
+     - Marcador exacto        → por defecto 5 pts (editable)
+     - Un equipo exacto       → por defecto 2 pts (editable)
+     - Ganador correcto       → por defecto 1 pt  (editable)
+     - Diferencia de goles    → por defecto 1 pt  (editable)
+6. Crea la polla
+7. La app guarda todos los partidos del torneo en Supabase con su api_id real
+8. El creador recibe un código de invitación para compartir
 ```
+
+> **Nota técnica:** Al abrir CreatePool, la app consulta la API para cada torneo y filtra los que ya iniciaron (`currentSeason.startDate > hoy`). Al seleccionar uno, se obtienen los partidos programados (SCHEDULED). Cada partido se guarda con su `api_id` real para que la Edge Function `sync-results` actualice marcadores automáticamente.
+
+> **V1.5 — Pollas Relámpago:** En esta versión sí se podrán usar torneos en curso, ya que el usuario elige partidos específicos del calendario (no el torneo completo). Ver `V1_5_PLAN.md`.
+
+### V1.5 — Pollas Relámpago (Flash Pools)
+
+Ver detalles en `V1_5_PLAN.md`. El usuario podrá seleccionar partidos a la carta de distintas ligas para crear pollas temáticas de corta duración (un fin de semana, una semana, un mes).
+
+```
+1. Usuario toca "Crear Polla Relámpago"
+2. Escribe nombre y define duración (fin de semana / semana / mes / fecha exacta)
+3. Explora partidos disponibles por liga o fecha
+4. Selecciona los partidos que quiere incluir (de una o varias ligas)
+5. Configura puntajes y visibilidad
+6. Crea la polla
+```
+
+### V2.0+ — Polla con Pago
+
+Extensión del flujo V1 o V1.5 con campos adicionales de entrada económica y distribución de premios. Ver `V2_0_PLAN.md`.
 
 ---
 

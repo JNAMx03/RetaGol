@@ -1,41 +1,76 @@
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useApp, Match } from '../../../context/AppContext';
 import { supabase } from '../../../services/supabase';
 import { getResultType, POINTS, BADGE_COLORS, BADGE_LABELS } from '../../../utils/scoring';
 
+const SYNC_FUNCTION_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-results`;
+
 export default function ResultsScreen({ route }: any) {
   const { pool } = route.params;
   const { user } = useApp();
-  const matches: Match[] = pool.matches ?? [];
 
+  const [matches, setMatches] = useState<Match[]>(pool.matches ?? []);
   const [predictions, setPredictions] = useState<Record<string, { homeScore: string; awayScore: string }>>({});
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      // Cargar predicciones del usuario
+      const { data: preds } = await supabase
+        .from('predictions')
+        .select('match_id, home_score, away_score')
+        .eq('pool_id', pool.id)
+        .eq('user_id', user?.id ?? '');
+
+      if (preds) {
+        const map: Record<string, { homeScore: string; awayScore: string }> = {};
+        preds.forEach((p) => {
+          map[p.match_id] = { homeScore: p.home_score ?? '', awayScore: p.away_score ?? '' };
+        });
+        setPredictions(map);
+      }
+
+      // Cargar marcadores frescos desde la BD
+      const { data: freshMatches } = await supabase
+        .from('matches')
+        .select('*')
+        .eq('pool_id', pool.id);
+
+      if (freshMatches) {
+        setMatches(freshMatches.map((m) => ({
+          id: m.id,
+          home: m.home,
+          away: m.away,
+          date: m.date,
+          homeScore: m.home_score ?? '',
+          awayScore: m.away_score ?? '',
+        })));
+      }
+    } catch (e) {
+      console.log('Error cargando resultados:', e);
+    }
+  };
 
   useEffect(() => {
-    const fetchPredictions = async () => {
-      try {
-        const { data } = await supabase
-          .from('predictions')
-          .select('match_id, home_score, away_score')
-          .eq('pool_id', pool.id)
-          .eq('user_id', user?.id ?? '');
-
-        if (data) {
-          const map: Record<string, { homeScore: string; awayScore: string }> = {};
-          data.forEach((p) => {
-            map[p.match_id] = { homeScore: p.home_score ?? '', awayScore: p.away_score ?? '' };
-          });
-          setPredictions(map);
-        }
-      } catch (e) {
-        console.log('Error cargando resultados:', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchPredictions();
+    fetchData().finally(() => setLoading(false));
   }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Pedir a la Edge Function que sincronice resultados desde API-Football
+      await fetch(SYNC_FUNCTION_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}` },
+      });
+    } catch (_) {
+      // Si la función falla, igual recargamos los datos locales
+    }
+    await fetchData();
+    setRefreshing(false);
+  };
 
   if (loading) {
     return (
@@ -46,7 +81,11 @@ export default function ResultsScreen({ route }: any) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.list}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.list}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563EB']} />}
+    >
       {matches.map((match) => {
         const pred = predictions[match.id];
         const hasResult = match.homeScore !== '' && match.awayScore !== '';

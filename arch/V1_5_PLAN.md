@@ -11,10 +11,60 @@
 |---|---|
 | Pollas públicas | Cualquiera puede descubrir y unirse a pollas abiertas |
 | Invitaciones por link | Compartir polla via link a WhatsApp/redes |
+| **Pollas Relámpago** | **Pollas de corta duración con partidos a la carta de distintas ligas** |
 | Chat de polla | Mensajería en tiempo real dentro de cada polla |
 | Sistema de amistades | Seguir usuarios, ver sus stats |
 | Logros (5–10 básicos) | Insignias por hitos como "Primer exacto", "Top 1" |
 | Mejoras UX | Ajustes basados en feedback de V1 |
+
+---
+
+## Pollas Relámpago (Flash Pools)
+
+Una polla relámpago es una polla de corta duración donde el creador elige partidos a la carta de cualquier liga o torneo disponible en football-data.org. No está atada a un torneo completo — puede mezclar partidos de La Liga, Champions y Premier en una misma polla si quiere.
+
+### Casos de uso típicos
+- **Polla de fin de semana:** los mejores partidos del sábado y domingo de todas las ligas
+- **Polla mensual:** los 10 partidos más importantes del mes
+- **Polla de clásicos:** El Clásico + Derby de Milán + North West Derby en una sola polla
+
+### Flujo de creación
+
+```
+1. Usuario toca "Crear Polla Relámpago"
+2. Escribe el nombre de la polla
+3. Define la duración:
+     - Fin de semana (viernes a lunes)
+     - Semana (lunes a domingo)
+     - Mes
+     - Fecha personalizada (desde/hasta)
+4. Explora partidos disponibles filtrados por:
+     - Liga / torneo
+     - Fecha
+     - Equipos (búsqueda)
+5. Selecciona los partidos que quiere incluir (de una o varias ligas)
+6. Configura puntajes y visibilidad (pública/privada)
+7. Crea la polla — partidos guardados con su api_id
+```
+
+### Cambios técnicos requeridos
+
+- Nueva pantalla `SelectMatchesScreen` con explorador de partidos por liga y fecha
+- Llamada a `football-data.org/v4/matches?dateFrom=X&dateTo=Y` para obtener partidos disponibles
+- Nuevo tipo de polla: `type: 'flash'` en la tabla `pools`
+- La Edge Function `sync-results` ya funciona sin cambios (lee por `api_id`)
+
+### Diferencia visual con V1
+
+| | Polla de Torneo (V1) | Polla Relámpago (V1.5) |
+|---|---|---|
+| Partidos | Todos los del torneo, automáticos | El creador elige cuáles |
+| Ligas | Una sola | Puede mezclar varias |
+| Torneos disponibles | Solo los que **aún no han iniciado** | Torneos en curso y próximos |
+| Duración | Temporada completa | Corta (fin de semana a un mes) |
+| Dificultad de creación | Baja | Media |
+
+> **Importante:** En V1.5 el selector de torneos/partidos SÍ puede mostrar torneos en curso, porque el usuario elige partidos específicos del calendario (no todo el torneo). Esto lo diferencia de V1 donde la polla cubre todos los partidos del torneo desde el inicio.
 
 ---
 

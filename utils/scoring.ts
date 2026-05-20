@@ -46,7 +46,7 @@ export function getResultType(
   return 'none';
 }
 
-/** Puntos por tipo de acierto */
+/** Puntos por defecto cuando la polla no tiene scoring_config */
 export const POINTS: Record<ResultType, number> = {
   exact: 5,
   one_team: 2,
@@ -54,6 +54,33 @@ export const POINTS: Record<ResultType, number> = {
   diff: 1,
   none: 0,
 };
+
+export interface ScoringConfig {
+  exact: number;
+  oneTeam: number;
+  winner: number;
+  goalDiff: number;
+}
+
+export const DEFAULT_SCORING: ScoringConfig = {
+  exact: 5,
+  oneTeam: 2,
+  winner: 1,
+  goalDiff: 1,
+};
+
+/** Devuelve los puntos usando el scoring configurable de la polla */
+export function getPoints(type: ResultType, config?: ScoringConfig): number {
+  if (!config) return POINTS[type];
+  const map: Record<ResultType, number> = {
+    exact: config.exact,
+    one_team: config.oneTeam,
+    winner: config.winner,
+    diff: config.goalDiff,
+    none: 0,
+  };
+  return map[type];
+}
 
 /** Color del badge por tipo de acierto */
 export const BADGE_COLORS: Record<ResultType, string> = {

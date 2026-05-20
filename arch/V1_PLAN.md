@@ -29,25 +29,25 @@ Stack (AppNavigator)
 
 ---
 
-## Estado del prototipo actual
+## Estado actual (Mayo 2026)
 
-El frontend está construido con datos mock. Esta tabla refleja lo que ya existe y lo que queda por hacer para tener una V1 con backend real:
-
-| Área | Prototipo | V1 real |
+| Área | Estado | Notas |
 |---|---|---|
-| Auth (Login/Register UI) | ✅ | Conectar a Supabase Auth |
-| Home con menú lateral | ✅ | — |
-| Pool tabs (4 sub-tabs) | ✅ | — |
-| Crear polla (UI) | ✅ | Persistir en Supabase |
-| Predicciones (UI + local) | ✅ | Persistir en Supabase |
-| Sistema de puntuación 5/2/1/1/0 | ✅ | Integrar con resultados reales |
-| Resultados con badge de puntos | ✅ mock | Conectar a API-Football |
-| Clasificación interna | ✅ mock | Datos reales de Supabase |
-| Perfil con stats (en menú lateral) | ✅ parcial | Stats calculadas desde DB |
-| Unirse a polla por código | UI lista | Conectar con Supabase |
-| Notificaciones push | ❌ | OneSignal |
-| Backend / DB | ❌ | Supabase |
-| Build y publicación | ❌ | EAS |
+| Auth (Login/Register) | ✅ Completo | Supabase Auth con perfil automático vía trigger |
+| Home con menú lateral | ✅ Completo | — |
+| Pool tabs (4 sub-tabs) | ✅ Completo | — |
+| Crear polla con torneos reales (football-data.org) | ✅ Completo | Solo torneos no iniciados con fixtures; resumen al seleccionar |
+| Scoring configurable por polla | ✅ Completo | Guardado en `pools.scoring_config` (jsonb) |
+| Partidos guardados con `api_id` real | ✅ Completo | Permite sync automático vía Edge Function |
+| Edge Function `sync-results` | ✅ Completo | Desplegada; activada por pull-to-refresh en ResultsScreen |
+| Predicciones | ✅ Completo | Upsert en Supabase |
+| Resultados con pull-to-refresh | ✅ Completo | Llama `sync-results` luego recarga marcadores |
+| Clasificación interna | ✅ Completo | Datos reales de Supabase |
+| Unirse a polla por código | ✅ Completo | Conectado con Supabase |
+| Results/Standings con scoring configurable | ⚠️ Pendiente | Aún usan `POINTS` fijo; cambiar a `getPoints(type, pool.scoringConfig)` |
+| Perfil con stats (menú lateral) | ⚠️ Parcial | Stats calculadas desde DB pendientes |
+| Notificaciones push | ❌ Pendiente | OneSignal — Fase 3C |
+| Build y publicación | ❌ Pendiente | EAS — Fase 5 |
 
 ---
 
@@ -62,18 +62,24 @@ El frontend está construido con datos mock. Esta tabla refleja lo que ya existe
 - [ ] Expo Go instalado en dispositivo físico (para pruebas rápidas)
 
 ### 0.2 Cuentas y servicios
-- [ ] Cuenta en [Supabase](https://supabase.com) — crear organización y proyecto `retagol-prod`
+- [x] Cuenta en [Supabase](https://supabase.com) — proyecto `retagol-prod` creado y conectado
 - [ ] Cuenta en [Expo](https://expo.dev) — crear proyecto `retagol`
-- [ ] Cuenta en [API-Football](https://rapidapi.com/api-sports/api/api-football) — plan gratuito (100 req/día)
+- [x] Cuenta en [football-data.org](https://www.football-data.org/client/register) — plan gratuito, cubre temporada actual
 - [ ] Cuenta en [OneSignal](https://onesignal.com) — plan gratuito
 - [ ] Cuenta en [Sentry](https://sentry.io) — plan gratuito para monitoreo de errores
 
 ### 0.3 Variables de entorno
-Crear `.env` en la raíz del proyecto (jamás subir a Git):
+Archivo `.env` en la raíz del proyecto (nunca subir a Git — ya está en `.gitignore`):
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://xxxxxxxx.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
+EXPO_PUBLIC_FOOTBALL_DATA_KEY=tu_key_de_football_data_org
 EXPO_PUBLIC_ONESIGNAL_APP_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+Secretos en Supabase (para Edge Functions — nunca van al cliente):
+```bash
+supabase secrets set FOOTBALL_DATA_KEY=tu_key_de_football_data_org
 ```
 
 ---
@@ -439,74 +445,74 @@ async function loadPools() {
 
 ## Fase 3B — Integración de Resultados Reales
 
-### 3B.1 API-Football (RapidAPI)
+**API utilizada:** football-data.org (plan gratuito — cubre temporada actual, 10 req/min)
 
-Crear `services/footballApi.ts`:
+### 3B.1 Servicio cliente en la app
+
+Crear `services/footballDataApi.ts`:
 
 ```typescript
-const API_KEY = process.env.EXPO_PUBLIC_RAPIDAPI_KEY;
-const BASE_URL = 'https://api-football-v1.p.rapidapi.com/v3';
+const BASE_URL = 'https://api.football-data.org/v4';
+const API_KEY = process.env.EXPO_PUBLIC_FOOTBALL_DATA_KEY!;
 
-export async function getFixtureResult(fixtureId: number) {
-  const response = await fetch(`${BASE_URL}/fixtures?id=${fixtureId}`, {
-    headers: {
-      'X-RapidAPI-Key': API_KEY!,
-      'X-RapidAPI-Host': 'api-football-v1.p.rapidapi.com',
-    },
-  });
-  const json = await response.json();
-  const fixture = json.response[0];
-  return {
-    homeScore: fixture.goals.home,
-    awayScore: fixture.goals.away,
-    status: fixture.fixture.status.short,  // 'FT' = terminado
-  };
+// Torneos disponibles en V1
+export const TOURNAMENTS = [
+  { code: 'CL',  name: 'Champions League',  color: '#1E40AF' },
+  { code: 'WC',  name: 'Mundial 2026',       color: '#15803D' },
+  { code: 'PD',  name: 'La Liga',            color: '#B91C1C' },
+  { code: 'CDR', name: 'Copa del Rey',       color: '#A16207' },
+  { code: 'PL',  name: 'Premier League',     color: '#6D28D9' },
+  { code: 'BL1', name: 'Bundesliga',         color: '#B45309' },
+  { code: 'SA',  name: 'Serie A',            color: '#0369A1' },
+];
+
+// Obtener próximos partidos de un torneo
+export async function getUpcomingMatches(competitionCode: string) {
+  const res = await fetch(
+    `${BASE_URL}/competitions/${competitionCode}/matches?status=SCHEDULED`,
+    { headers: { 'X-Auth-Token': API_KEY } }
+  );
+  const data = await res.json();
+  return data.matches ?? [];
 }
 ```
 
-### 3B.2 Edge Function para sincronizar resultados
+### 3B.2 Cambios en la base de datos
 
-En Supabase, crear `supabase/functions/sync-results/index.ts`:
+```sql
+-- Añadir api_id a matches (ya ejecutado)
+ALTER TABLE matches ADD COLUMN api_id int;
+
+-- Añadir scoring_config a pools para puntajes configurables
+ALTER TABLE pools ADD COLUMN scoring_config jsonb
+  DEFAULT '{"exact": 5, "oneTeam": 2, "winner": 1, "goalDiff": 1}';
+```
+
+### 3B.3 Flujo completo de creación de polla con API
+
+Al crear una polla, el `CreatePoolScreen` llama a `getUpcomingMatches()` y guarda los partidos con su `api_id` real:
 
 ```typescript
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-serve(async () => {
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
-
-  // Obtener partidos sin resultado y con api_id
-  const { data: matches } = await supabase
-    .from('matches')
-    .select('*')
-    .is('home_score', null)
-    .not('api_id', 'is', null);
-
-  for (const match of matches ?? []) {
-    const result = await fetchFromAPIFootball(match.api_id);
-    if (result.status === 'FT') {
-      await supabase.from('matches').update({
-        home_score: String(result.homeScore),
-        away_score: String(result.awayScore),
-      }).eq('id', match.id);
-    }
-  }
-
-  return new Response('ok');
-});
+// En createPool() del AppContext:
+const matchRows = matches.map((m) => ({
+  id: `${pool.id}_${m.apiId}`,   // ID único en nuestra BD
+  pool_id: pool.id,
+  home: m.home,
+  away: m.away,
+  date: m.date,
+  api_id: m.apiId,               // ID real de football-data.org
+}));
 ```
 
-Desplegar la función:
-```bash
-npx supabase functions deploy sync-results
-```
+### 3B.4 Edge Function sync-results
 
-Configurar cron en Supabase (Dashboard → Edge Functions → Schedules):
-- Frecuencia: cada 5 minutos durante días de partido
-- O: llamar manualmente desde la app con un pull-to-refresh
+Archivo: `supabase/functions/sync-results/index.ts` (ya desplegado).
+
+Usa el secreto `FOOTBALL_DATA_KEY` en Supabase. Consulta partidos con `api_id` definido y `home_score` null. Cuando `status === 'FINISHED'` actualiza los marcadores automáticamente.
+
+Activación:
+- **Pull-to-refresh** en ResultsScreen llama a la función y recarga los datos
+- **Cron** (opcional): Supabase Dashboard → Edge Functions → Schedules, cada hora en días de partido
 
 ---
 
@@ -564,9 +570,10 @@ OneSignal.login(user.id);
 - [ ] Logout redirige a Login y limpia el estado
 
 **Flujo de creación de polla:**
-- [ ] Crear polla Liga genera 4 partidos predefinidos
-- [ ] Crear polla Copa genera 4 partidos predefinidos
-- [ ] Crear polla Champions genera 4 partidos predefinidos
+- [ ] Seleccionar torneo carga los partidos reales desde football-data.org
+- [ ] Los partidos se muestran con equipos y fechas reales
+- [ ] Los puntajes configurables se guardan en `scoring_config` de la polla
+- [ ] Cada partido se guarda en Supabase con su `api_id` real
 - [ ] El código generado es único (verificar en Supabase)
 - [ ] La polla aparece en Home del creador
 - [ ] El creador aparece como participante
