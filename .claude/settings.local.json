@@ -6,7 +6,9 @@
       "Bash(New-Item -ItemType Directory -Force \"d:\\\\Projects\\\\RetaGol\\\\supabase\\\\functions\\\\sync-results\")",
       "Bash(Out-Null)",
       "Bash(Write-Output \"OK\")",
-      "PowerShell(New-Item -ItemType Directory -Force \"d:\\\\Projects\\\\RetaGol\\\\supabase\\\\functions\\\\sync-results\")"
+      "PowerShell(New-Item -ItemType Directory -Force \"d:\\\\Projects\\\\RetaGol\\\\supabase\\\\functions\\\\sync-results\")",
+      "Bash(npx expo *)",
+      "Bash(npm install *)"
     ]
   }
 }

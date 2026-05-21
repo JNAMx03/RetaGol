@@ -44,10 +44,11 @@ Stack (AppNavigator)
 | Resultados con pull-to-refresh | ✅ Completo | Llama `sync-results` luego recarga marcadores |
 | Clasificación interna | ✅ Completo | Datos reales de Supabase |
 | Unirse a polla por código | ✅ Completo | Conectado con Supabase |
-| Results/Standings con scoring configurable | ⚠️ Pendiente | Aún usan `POINTS` fijo; cambiar a `getPoints(type, pool.scoringConfig)` |
+| Results/Standings con scoring configurable | ✅ Completo | `getPoints(type, pool.scoringConfig)` en ResultsScreen y StandingsScreen |
 | Perfil con stats (menú lateral) | ⚠️ Parcial | Stats calculadas desde DB pendientes |
-| Notificaciones push | ❌ Pendiente | OneSignal — Fase 3C |
-| Build y publicación | ❌ Pendiente | EAS — Fase 5 |
+| Notificaciones push — SDK + Edge Functions | ⚠️ Parcial | `react-native-onesignal` v5 instalado; `sync-results` envía push al actualizar; `send-reminders` (cron horario); `notify-join` (al unirse). Falta: `google-services.json` para FCM en Android, migración SQL (`onesignal_player_id`, `utc_date`), cron en Supabase, desplegar `send-reminders` y `notify-join` |
+| Dev build EAS | ✅ Completo | APK de desarrollo generado e instalado en Android físico |
+| Build producción y Google Play | ❌ Pendiente | EAS — Fase 5 |
 
 ---
 
@@ -518,43 +519,52 @@ Activación:
 
 ## Fase 3C — Notificaciones Push
 
-### 3C.1 Configurar OneSignal
+### 3C.1 Configurar OneSignal ✅
 
-```bash
-npx expo install onesignal-expo-plugin
-```
+- `react-native-onesignal` v5.4.5 instalado
+- App ID: configurado en `.env` como `EXPO_PUBLIC_ONESIGNAL_APP_ID`
+- REST API Key: secreto de Supabase `ONESIGNAL_REST_API_KEY` (solo servidor)
+- **Nota:** `react-native-onesignal` v5 no tiene Expo config plugin — se quitó de `app.json`. La entrega en Android requiere agregar `google-services.json` (Firebase FCM) en la Fase 5
 
-Agregar en `app.json`:
-```json
-{
-  "expo": {
-    "plugins": [
-      ["onesignal-expo-plugin", { "mode": "development" }]
-    ]
-  }
-}
-```
+### 3C.2 Inicializar OneSignal en App.tsx ✅
 
-### 3C.2 Inicializar OneSignal en App.tsx
-
-```typescript
-import OneSignal from 'react-native-onesignal';
-
-// En App.tsx useEffect:
-OneSignal.initialize(process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID!);
-OneSignal.Notifications.requestPermission(true);
-
-// Asociar el usuario autenticado con el dispositivo
-OneSignal.login(user.id);
-```
+`App.tsx` inicializa OneSignal, pide permisos y guarda el subscription ID en `profiles.onesignal_player_id` (Supabase) cuando hay sesión activa.
 
 ### 3C.3 Tipos de notificaciones V1
 
-| Evento | Disparador | Cuándo enviar |
+| Evento | Disparador | Estado |
 |---|---|---|
-| Resultado disponible | Edge Function sync-results | Cuando `home_score` deja de ser null |
-| Recordatorio partido | Cron 2h antes de kickoff | 2 horas antes del `date` del partido |
-| Invitación a polla | Al unirse alguien nuevo | Notificar al creador |
+| Resultado disponible | `sync-results` cuando `status === FINISHED` | ✅ Implementado |
+| Recordatorio partido | `send-reminders` (cron horario, 1h antes) | ✅ Implementado — falta desplegar y configurar cron |
+| Alguien se unió a tu polla | `notify-join` llamado desde `joinPool()` | ✅ Implementado — falta desplegar |
+
+### 3C.4 Pendiente para activar notificaciones en producción
+
+```sql
+-- Migraciones en Supabase SQL Editor:
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS onesignal_player_id TEXT;
+ALTER TABLE matches   ADD COLUMN IF NOT EXISTS utc_date TEXT;
+```
+
+```bash
+# Desplegar nuevas Edge Functions:
+supabase functions deploy send-reminders
+supabase functions deploy notify-join
+supabase functions deploy sync-results  -- ya actualizado con notificaciones
+```
+
+```sql
+-- Cron para send-reminders (cada hora):
+SELECT cron.schedule('send-match-reminders', '0 * * * *', $$
+  SELECT net.http_post(
+    url     := 'https://TU_PROYECTO.supabase.co/functions/v1/send-reminders',
+    headers := jsonb_build_object('Authorization', 'Bearer TU_SERVICE_ROLE_KEY', 'Content-Type', 'application/json'),
+    body    := '{}'::jsonb
+  )
+$$);
+```
+
+Para entrega real en Android: agregar `google-services.json` de Firebase en Fase 5.
 
 ---
 

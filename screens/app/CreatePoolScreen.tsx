@@ -69,6 +69,7 @@ export default function CreatePoolScreen({ navigation }: any) {
         home: m.homeTeam.name,
         away: m.awayTeam.name,
         date: formatMatchDate(m.utcDate),
+        utcDate: m.utcDate,
         homeScore: '',
         awayScore: '',
         apiId: m.id,

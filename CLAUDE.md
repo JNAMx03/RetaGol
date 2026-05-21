@@ -67,18 +67,25 @@ Funciones del contexto:
 | `profiles` | Perfil de usuario (sincronizado con Supabase Auth vía trigger) |
 | `pools` | Pollas: name, type, code, creator_id, participants, scoring_config (jsonb), status |
 | `pool_participants` | Relación usuario ↔ polla |
-| `matches` | Partidos: home, away, date, home_score, away_score, api_id (int, ID de football-data.org) |
+| `matches` | Partidos: home, away, date, utc_date, home_score, away_score, api_id (int, ID de football-data.org) |
 | `predictions` | Predicciones: pool_id, match_id, user_id, home_score, away_score |
 
 Columnas clave:
 - `pools.scoring_config` (jsonb): `{ exact, oneTeam, winner, goalDiff }` — configurable al crear la polla
 - `matches.api_id` (int): ID real de football-data.org para sincronización automática de resultados
+- `matches.utc_date` (text): fecha ISO UTC del partido — usada por `send-reminders` para comparar fechas
+- `profiles.onesignal_player_id` (text): subscription ID de OneSignal para enviar push al dispositivo
 
 ### Edge Functions (`supabase/functions/`)
 
-- **`sync-results/index.ts`**: Consulta partidos con `api_id != null` y `home_score = null`. Para cada uno llama a `football-data.org/v4/matches/{api_id}`. Si `status === 'FINISHED'`, actualiza `home_score` y `away_score` en Supabase. Usa el secreto `FOOTBALL_DATA_KEY` (servidor).
+- **`sync-results/index.ts`**: Consulta partidos con `api_id != null` y `home_score = null`. Para cada uno llama a `football-data.org/v4/matches/{api_id}`. Si `status === 'FINISHED'`, actualiza marcadores y envía push a participantes de la polla. Secretos: `FOOTBALL_DATA_KEY`, `ONESIGNAL_REST_API_KEY`.
+- **`send-reminders/index.ts`**: Cron cada hora. Busca partidos con `utc_date` en la próxima hora y `home_score = null`. Envía push "Partido en 1 hora" a los participantes. Secreto: `ONESIGNAL_REST_API_KEY`.
+- **`notify-join/index.ts`**: Llamada desde `joinPool()` en el app. Recibe `pool_id`, `pool_name`, `joiner_name`. Busca el `onesignal_player_id` del creador y le envía push. Secreto: `ONESIGNAL_REST_API_KEY`.
+- **`_shared/onesignal.ts`**: Helper compartido `sendPushNotification(playerIds, title, message, data?)` — llama a la REST API de OneSignal v2.
 
-Activación: pull-to-refresh en ResultsScreen hace POST a la función antes de recargar datos.
+Activación de `sync-results`: pull-to-refresh en ResultsScreen hace POST antes de recargar datos.
+Activación de `send-reminders`: cron en Supabase vía `pg_cron` + `pg_net` (cada hora).
+Activación de `notify-join`: llamada directa desde `joinPool()` en AppContext (fire & forget).
 
 ### Navigation (`navigation/`)
 
@@ -121,7 +128,7 @@ Exporta:
 - `getPoints(type, config?)` → puntos respetando scoring configurable de la polla
 - `BADGE_COLORS`, `BADGE_LABELS`
 
-**Pendiente:** ResultsScreen y StandingsScreen aún usan `POINTS[type]` en vez de `getPoints(type, pool.scoringConfig)`. Hay que cambiar eso para que el scoring configurable tenga efecto real en la UI.
+ResultsScreen y StandingsScreen usan `getPoints(type, pool.scoringConfig)` — el scoring configurable ya tiene efecto real en la UI.
 
 ### Services (`services/`)
 
@@ -155,8 +162,8 @@ Exporta:
 
 - `app/JoinPoolScreen`: input de código (auto-uppercase); busca en Supabase y registra participante
 - `app/pool/PredictionsScreen`: FlatList de MatchCards editables + botón Guardar (upsert en Supabase)
-- `app/pool/ResultsScreen`: carga predicciones y marcadores frescos de Supabase; pull-to-refresh llama Edge Function `sync-results` antes de recargar; badges de puntos (aún usa `POINTS` fijo — pendiente cambiar a `getPoints`)
-- `app/pool/StandingsScreen`: calcula puntos leyendo predicciones y resultados de Supabase; ordena por puntos; resalta usuario actual (aún usa `POINTS` fijo — pendiente cambiar a `getPoints`)
+- `app/pool/ResultsScreen`: carga predicciones y marcadores frescos de Supabase; pull-to-refresh llama Edge Function `sync-results` antes de recargar; badges de puntos usando `getPoints(type, pool.scoringConfig)`
+- `app/pool/StandingsScreen`: calcula puntos leyendo predicciones y resultados de Supabase; ordena por puntos; resalta usuario actual; usa `getPoints(type, pool.scoringConfig)`
 - `app/pool/InfoScreen`: datos del pool + sistema de puntuación en acordeón
 
 ### Components (`components/`)
@@ -172,7 +179,9 @@ Exporta:
 - **Colores base**: slate `#64748B`, green `#16A34A`, blue `#2563EB`, bg `#F1F5F9`, white `#FFFFFF`
   - Exacto → `#16A34A` | Parcial → `#2563EB` | Ganador/Diff → `#EAB308` | Sin acierto → `#94A3B8`
 - **Comentarios**: escritos en español; mantener ese estilo al agregar comentarios
-- **Scoring**: usar siempre `getPoints(type, pool.scoringConfig)` en ResultsScreen y StandingsScreen — no `POINTS[type]` directamente (esto está pendiente de corregir)
+- **Scoring**: usar siempre `getPoints(type, pool.scoringConfig)` — nunca `POINTS[type]` directamente. Ya implementado en ResultsScreen y StandingsScreen
+- **OneSignal**: subscription ID se guarda en `profiles.onesignal_player_id` al abrir la app. Las Edge Functions lo leen para enviar push. La entrega en Android requiere FCM (`google-services.json`) — pendiente para build de producción
+- **Match.utcDate**: guardar siempre el ISO UTC de football-data.org junto con `date` (string formateado). `utcDate` es lo que usa `send-reminders` para comparar fechas en la BD
 - **API de partidos**: toda la lógica de football-data.org va en `services/footballDataApi.ts`. El `api_id` de cada partido es el `id` numérico de football-data.org — fundamental para que `sync-results` funcione
 - **Caché de partidos**: `matchCache` en footballDataApi.ts evita llamadas repetidas a la API dentro de la misma sesión
 
@@ -190,9 +199,10 @@ Exporta:
 | Resultados con pull-to-refresh → sync-results | ✅ Completo |
 | Clasificación con datos reales de Supabase | ✅ Completo |
 | Unirse a polla por código | ✅ Completo |
-| Resultados/Clasificación respetando scoring configurable | ⚠️ Pendiente — usar `getPoints()` en vez de `POINTS` |
-| Notificaciones push (OneSignal) | ❌ Pendiente — Fase 3C |
-| Build y publicación (EAS) | ❌ Pendiente — Fase 5 |
+| Resultados/Clasificación respetando scoring configurable | ✅ Completo |
+| Notificaciones push (OneSignal) — SDK + Edge Functions | ⚠️ Parcial — SDK integrado, 3 Edge Functions creadas; falta Firebase FCM (`google-services.json`) para entrega en Android |
+| Dev build EAS instalado en Android | ✅ Completo — APK de desarrollo generado e instalado |
+| Build producción y Google Play | ❌ Pendiente — Fase 5 |
 
 ## Roadmap (versiones futuras)
 

@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl }
 import { useState, useEffect } from 'react';
 import { useApp, Match } from '../../../context/AppContext';
 import { supabase } from '../../../services/supabase';
-import { getResultType, POINTS, BADGE_COLORS, BADGE_LABELS } from '../../../utils/scoring';
+import { getResultType, getPoints, BADGE_COLORS, BADGE_LABELS } from '../../../utils/scoring';
 
 const SYNC_FUNCTION_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-results`;
 
@@ -91,7 +91,7 @@ export default function ResultsScreen({ route }: any) {
         const hasResult = match.homeScore !== '' && match.awayScore !== '';
         const result = hasResult ? { homeScore: match.homeScore, awayScore: match.awayScore } : undefined;
         const type = getResultType(pred, result);
-        const points = POINTS[type];
+        const points = getPoints(type, pool.scoringConfig);
         const badgeColor = BADGE_COLORS[type];
         const badgeLabel = BADGE_LABELS[type];
 

@@ -12,6 +12,7 @@ export interface Match {
   home: string;
   away: string;
   date: string;
+  utcDate?: string;
   homeScore: string;
   awayScore: string;
   apiId?: number;
@@ -73,6 +74,7 @@ const mapPool = (pool: any, matches: any[]): Pool => ({
     home: m.home,
     away: m.away,
     date: m.date,
+    utcDate: m.utc_date ?? undefined,
     homeScore: m.home_score ?? '',
     awayScore: m.away_score ?? '',
   })),
@@ -200,6 +202,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       home: m.home,
       away: m.away,
       date: m.date,
+      utc_date: m.utcDate ?? null,
       api_id: m.apiId ?? null,
     }));
 
@@ -257,6 +260,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // 4. Construir objeto Pool y actualizar estado
     const newPool = mapPool({ ...pool, participants: pool.participants + 1 }, pool.matches ?? []);
     setPools((prev) => [...prev, newPool]);
+
+    // Notificar al creador de la polla (fire & forget)
+    fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/notify-join`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        pool_id: pool.id,
+        pool_name: pool.name,
+        joiner_name: user.name,
+      }),
+    }).catch(() => {});
 
     return newPool;
   };

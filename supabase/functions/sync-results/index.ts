@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendPushNotification } from '../_shared/onesignal.ts';
 
 serve(async () => {
   const supabase = createClient(
@@ -25,6 +26,7 @@ serve(async () => {
   }
 
   let updated = 0;
+  const updatedPoolIds = new Set<string>();
 
   for (const match of matches) {
     try {
@@ -49,10 +51,42 @@ serve(async () => {
           })
           .eq('id', match.id);
 
+        updatedPoolIds.add(match.pool_id);
         updated++;
       }
     } catch (e) {
       console.error(`Error sincronizando match ${match.id}:`, e);
+    }
+  }
+
+  // Notificar a los participantes de cada polla con resultados nuevos
+  for (const poolId of updatedPoolIds) {
+    try {
+      const { data: participants } = await supabase
+        .from('pool_participants')
+        .select('profiles(onesignal_player_id)')
+        .eq('pool_id', poolId);
+
+      const playerIds = (participants ?? [])
+        .map((p: any) => p.profiles?.onesignal_player_id)
+        .filter(Boolean);
+
+      if (playerIds.length === 0) continue;
+
+      const { data: pool } = await supabase
+        .from('pools')
+        .select('name')
+        .eq('id', poolId)
+        .single();
+
+      await sendPushNotification(
+        playerIds,
+        'Resultado disponible',
+        `Nuevos resultados en "${pool?.name ?? 'tu polla'}" — ¡revisa tu clasificación!`,
+        { type: 'result', pool_id: poolId },
+      );
+    } catch (e) {
+      console.error(`Error notificando pool ${poolId}:`, e);
     }
   }
 

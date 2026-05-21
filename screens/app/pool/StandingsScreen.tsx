@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-nat
 import { useState, useEffect } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { supabase } from '../../../services/supabase';
-import { getResultType, POINTS } from '../../../utils/scoring';
+import { getResultType, getPoints } from '../../../utils/scoring';
 
 interface Participant {
   id: string;
@@ -51,7 +51,7 @@ export default function StandingsScreen({ route }: any) {
               { homeScore: pred.home_score, awayScore: pred.away_score },
               { homeScore: match.homeScore, awayScore: match.awayScore },
             );
-            return total + POINTS[type];
+            return total + getPoints(type, pool.scoringConfig);
           }, 0);
 
           return {
