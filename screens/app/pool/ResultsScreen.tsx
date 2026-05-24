@@ -14,6 +14,7 @@ export default function ResultsScreen({ route }: any) {
   const [predictions, setPredictions] = useState<Record<string, { homeScore: string; awayScore: string }>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -32,14 +33,27 @@ export default function ResultsScreen({ route }: any) {
         setPredictions(map);
       }
 
-      // Cargar marcadores frescos desde la BD
-      const { data: freshMatches } = await supabase
+      // Cargar marcadores frescos desde la BD (columnas explícitas para evitar problemas con select *)
+      const { data: freshMatches, error: matchError } = await supabase
         .from('matches')
-        .select('*')
+        .select('id, home, away, date, home_score, away_score')
         .eq('pool_id', pool.id);
 
-      if (freshMatches) {
-        setMatches(freshMatches.map((m) => ({
+      if (matchError) {
+        setLoadError(true);
+        return;
+      }
+
+      if (freshMatches && freshMatches.length > 0) {
+        // Ordenar: partidos con resultado primero, luego pendientes
+        const sorted = [...freshMatches].sort((a, b) => {
+          const aHasResult = a.home_score != null && a.away_score != null;
+          const bHasResult = b.home_score != null && b.away_score != null;
+          if (aHasResult && !bHasResult) return -1;
+          if (!aHasResult && bHasResult) return 1;
+          return 0;
+        });
+        setMatches(sorted.map((m) => ({
           id: m.id,
           home: m.home,
           away: m.away,
@@ -47,9 +61,14 @@ export default function ResultsScreen({ route }: any) {
           homeScore: m.home_score ?? '',
           awayScore: m.away_score ?? '',
         })));
+      } else if (freshMatches && freshMatches.length === 0) {
+        // Supabase devolvió vacío — puede ser un problema de RLS
+        console.warn('[ResultsScreen] ⚠️ Supabase devolvió 0 matches para pool:', pool.id);
+        // Conservar pool.matches como fallback para no dejar pantalla vacía
       }
     } catch (e) {
       console.log('Error cargando resultados:', e);
+      setLoadError(true);
     }
   };
 
@@ -76,6 +95,16 @@ export default function ResultsScreen({ route }: any) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ color: '#64748B', textAlign: 'center', fontSize: 14, lineHeight: 22 }}>
+          No se pudieron cargar los resultados.{'\n'}Verifica tu conexión e intenta de nuevo.
+        </Text>
       </View>
     );
   }

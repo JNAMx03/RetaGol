@@ -64,16 +64,19 @@ export default function CreatePoolScreen({ navigation }: any) {
     if (!canCreate || creating) return;
     setCreating(true);
     try {
-      const mappedMatches: Match[] = cachedMatches.map((m) => ({
-        id: String(m.id),
-        home: m.homeTeam.name,
-        away: m.awayTeam.name,
-        date: formatMatchDate(m.utcDate),
-        utcDate: m.utcDate,
-        homeScore: '',
-        awayScore: '',
-        apiId: m.id,
-      }));
+      // Los partidos del caché ya están filtrados (sin equipos TBD), pero por seguridad usamos fallback
+      const mappedMatches: Match[] = cachedMatches
+        .filter((m) => m.homeTeam?.name && m.awayTeam?.name)
+        .map((m) => ({
+          id: String(m.id),
+          home: m.homeTeam.name!,
+          away: m.awayTeam.name!,
+          date: formatMatchDate(m.utcDate),
+          utcDate: m.utcDate,
+          homeScore: '',
+          awayScore: '',
+          apiId: m.id,
+        }));
 
       await createPool(name.trim(), selected!.code, mappedMatches, scoring);
       navigation.goBack();

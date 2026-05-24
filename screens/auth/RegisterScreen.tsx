@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { translateError } from '../../utils/errorMessages';
 
 export default function RegisterScreen({ navigation }: any) {
   const { register } = useApp();
@@ -36,8 +37,8 @@ export default function RegisterScreen({ navigation }: any) {
     setLoading(true);
     try {
       await register(email.trim(), password, fullName.trim());
-    } catch (e: any) {
-      setError(e.message ?? 'Error al crear la cuenta');
+    } catch (e) {
+      setError(translateError(e));
     } finally {
       setLoading(false);
     }

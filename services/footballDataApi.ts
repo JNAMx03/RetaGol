@@ -17,8 +17,9 @@ export interface ApiMatch {
   id: number;
   utcDate: string;
   status: string;
-  homeTeam: { name: string };
-  awayTeam: { name: string };
+  // name puede ser null en fases eliminatorias donde aún no se saben los equipos (ej. "TBD")
+  homeTeam: { name: string | null };
+  awayTeam: { name: string | null };
 }
 
 export interface AvailableTournament {
@@ -48,7 +49,7 @@ export async function getAvailableTournaments(): Promise<AvailableTournament[]> 
   const today = new Date();
 
   const results = await Promise.allSettled(
-    TOURNAMENTS.map(async (t) => {
+    TOURNAMENTS.map(async (t): Promise<AvailableTournament | null> => {
       // 1. Info de la competición para saber si ya inició
       const info = await fetchJSON(`${BASE_URL}/competitions/${t.code}`);
       const season = info.currentSeason;
@@ -61,29 +62,31 @@ export async function getAvailableTournaments(): Promise<AvailableTournament[]> 
       const matchData = await fetchJSON(
         `${BASE_URL}/competitions/${t.code}/matches?status=SCHEDULED`,
       );
-      const matches: ApiMatch[] = matchData.matches ?? [];
-      if (matches.length === 0) return null; // sin fixtures → no mostrar
+      // Filtrar partidos donde los equipos aún no están definidos (fases eliminatorias TBD)
+      const allMatches: ApiMatch[] = matchData.matches ?? [];
+      const matches = allMatches.filter(
+        (m) => m.homeTeam?.name != null && m.awayTeam?.name != null,
+      );
+      if (matches.length === 0) return null; // sin fixtures con equipos definidos → no mostrar
 
       // Guardar en caché para reutilizar al crear la polla
       matchCache[t.code as TournamentCode] = matches;
 
       return {
         code: t.code as TournamentCode,
-        name: t.name,
-        color: t.color,
+        name: t.name as string,
+        color: t.color as string,
         startDate: season.startDate,
         endDate: season.endDate,
         totalMatches: matches.length,
-      } satisfies AvailableTournament;
+      };
     }),
   );
 
   return results
-    .filter(
-      (r): r is PromiseFulfilledResult<AvailableTournament> =>
-        r.status === 'fulfilled' && r.value !== null,
-    )
-    .map((r) => r.value);
+    .filter((r): r is PromiseFulfilledResult<AvailableTournament | null> => r.status === 'fulfilled')
+    .map((r) => r.value)
+    .filter((v): v is AvailableTournament => v !== null);
 }
 
 /**
@@ -96,7 +99,10 @@ export async function getScheduledMatches(code: TournamentCode): Promise<ApiMatc
   const data = await fetchJSON(
     `${BASE_URL}/competitions/${code}/matches?status=SCHEDULED`,
   );
-  const matches: ApiMatch[] = data.matches ?? [];
+  // Filtrar partidos donde los equipos aún no están definidos (fases eliminatorias TBD)
+  const matches: ApiMatch[] = (data.matches ?? []).filter(
+    (m: ApiMatch) => m.homeTeam?.name != null && m.awayTeam?.name != null,
+  );
   matchCache[code] = matches;
   return matches;
 }

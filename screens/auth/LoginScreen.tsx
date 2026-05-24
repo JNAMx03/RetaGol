@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { translateError } from '../../utils/errorMessages';
 
 export default function LoginScreen({ navigation }: any) {
   const { login } = useApp();
@@ -26,8 +27,8 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(true);
     try {
       await login(email.trim(), password);
-    } catch (e: any) {
-      setError(e.message ?? 'Error al iniciar sesión');
+    } catch (e) {
+      setError(translateError(e));
     } finally {
       setLoading(false);
     }
@@ -40,12 +41,12 @@ export default function LoginScreen({ navigation }: any) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          {/* Avatar */}
+          {/* Logo */}
           <View style={styles.avatar}>
-            <Text style={styles.avatarIcon}>e</Text>
+            <Text style={styles.avatarIcon}>⚽</Text>
           </View>
 
-          <Text style={styles.appName}>Pollas App</Text>
+          <Text style={styles.appName}>RetaGol</Text>
           <Text style={styles.appSubtitle}>Predice y compite con tus amigos</Text>
 
           {/* Tarjeta del formulario */}

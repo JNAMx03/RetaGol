@@ -12,7 +12,7 @@ export default function App() {
     OneSignal.Notifications.requestPermission(true);
 
     const savePlayerId = async () => {
-      const id = OneSignal.User.pushSubscription.id;
+      const id = (OneSignal.User.pushSubscription as any).id as string | undefined;
       if (!id) return;
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {

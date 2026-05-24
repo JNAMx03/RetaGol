@@ -42,6 +42,7 @@ interface AppContextType {
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   pools: Pool[];
+  refreshPools: () => Promise<void>;
   createPool: (name: string, type: string, matches: Match[], scoring: ScoringConfig) => Promise<void>;
   joinPool: (code: string) => Promise<Pool>;
   predictions: Record<string, Record<string, Match[]>>;
@@ -55,7 +56,7 @@ const AppContext = createContext<AppContextType | null>(null);
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
 
-const generateCode = (type: CompetitionType): string => {
+const generateCode = (type: string): string => {
   const prefix = type === 'liga' ? 'L' : type === 'copa' ? 'C' : 'CH';
   const num = Math.floor(1000 + Math.random() * 9000);
   return `${prefix}${num}`;
@@ -120,6 +121,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
   const loadPoolsForUser = async (userId: string) => {
+    // 1. Cargar las pollas con sus partidos
     const { data, error } = await supabase
       .from('pool_participants')
       .select('pools(*, matches(*))')
@@ -127,10 +129,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     if (error || !data) return;
 
-    const myPools: Pool[] = data
-      .map((row: any) => row.pools)
-      .filter(Boolean)
-      .map((pool: any) => mapPool(pool, pool.matches ?? []));
+    const poolsRaw = data.map((row: any) => row.pools).filter(Boolean);
+    if (poolsRaw.length === 0) { setPools([]); return; }
+
+    // 2. Contar participantes reales de cada polla desde pool_participants
+    //    (más confiable que la columna pools.participants, que puede quedar desincronizada)
+    const poolIds = poolsRaw.map((p: any) => p.id);
+    const { data: allParticipants } = await supabase
+      .from('pool_participants')
+      .select('pool_id')
+      .in('pool_id', poolIds);
+
+    const countByPool: Record<string, number> = {};
+    (allParticipants ?? []).forEach((row: any) => {
+      countByPool[row.pool_id] = (countByPool[row.pool_id] ?? 0) + 1;
+    });
+
+    // 3. Construir los objetos Pool con el conteo real
+    const myPools: Pool[] = poolsRaw.map((pool: any) => ({
+      ...mapPool(pool, pool.matches ?? []),
+      participants: countByPool[pool.id] ?? pool.participants,
+    }));
 
     setPools(myPools);
   };
@@ -245,20 +264,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     if (existing) throw new Error('YA_PARTICIPANTE');
 
-    // 3. Registrar participante y actualizar contador
+    // 3. Registrar participante (el trigger en BD actualiza pools.participants automáticamente)
     const { error: joinError } = await supabase
       .from('pool_participants')
       .insert({ pool_id: pool.id, user_id: user.id });
 
     if (joinError) throw joinError;
 
-    await supabase
-      .from('pools')
-      .update({ participants: pool.participants + 1 })
-      .eq('id', pool.id);
+    // 4. Consultar el conteo real de participantes tras el insert
+    const { data: partRows } = await supabase
+      .from('pool_participants')
+      .select('user_id')
+      .eq('pool_id', pool.id);
 
-    // 4. Construir objeto Pool y actualizar estado
-    const newPool = mapPool({ ...pool, participants: pool.participants + 1 }, pool.matches ?? []);
+    const realCount = partRows?.length ?? pool.participants + 1;
+
+    // 5. Construir objeto Pool con el conteo real y actualizar estado
+    const newPool = mapPool({ ...pool }, pool.matches ?? []);
+    newPool.participants = realCount;
     setPools((prev) => [...prev, newPool]);
 
     // Notificar al creador de la polla (fire & forget)
@@ -323,6 +346,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Recarga las pollas del usuario desde Supabase — útil al volver a Home
+  const refreshPools = async () => {
+    if (user) await loadPoolsForUser(user.id);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -332,6 +360,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         register,
         logout,
         pools,
+        refreshPools,
         createPool,
         joinPool,
         predictions,

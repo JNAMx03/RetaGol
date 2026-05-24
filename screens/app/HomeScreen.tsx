@@ -9,7 +9,7 @@ import {
   TouchableWithoutFeedback,
   ScrollView,
 } from 'react-native';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp, Pool } from '../../context/AppContext';
 import PoolCard from '../../components/PoolCard';
@@ -35,10 +35,18 @@ const SETTINGS_APP = [
 ];
 
 export default function HomeScreen({ navigation }: any) {
-  const { pools, user, logout } = useApp();
+  const { pools, user, logout, refreshPools } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
   const translateX = useRef(new Animated.Value(-MENU_WIDTH)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  // Recargar pollas cada vez que Home recibe foco (ej. al volver de CreatePool, JoinPool, etc.)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refreshPools();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const initials = (user?.name ?? 'U')
     .split(' ')

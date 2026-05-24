@@ -17,6 +17,7 @@ export default function StandingsScreen({ route }: any) {
   const { user } = useApp();
   const [ranking, setRanking] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     const fetchStandings = async () => {
@@ -37,19 +38,31 @@ export default function StandingsScreen({ route }: any) {
 
         if (predError) return;
 
+        // Cargar marcadores frescos de Supabase (pueden haber sido actualizados por sync-results)
+        const { data: freshMatches } = await supabase
+          .from('matches')
+          .select('id, home_score, away_score')
+          .eq('pool_id', pool.id);
+
+        const matchScores = (freshMatches ?? []).reduce((acc: Record<string, { homeScore: string; awayScore: string }>, m: any) => {
+          acc[m.id] = { homeScore: m.home_score ?? '', awayScore: m.away_score ?? '' };
+          return acc;
+        }, {});
+
         // Calcular puntos por participante
         const calculated: Participant[] = participants.map((p: any) => {
           const userPreds = (allPreds ?? []).filter((pr) => pr.user_id === p.user_id);
 
           const points = (pool.matches ?? []).reduce((total: number, match: any) => {
-            if (match.homeScore === '' || match.awayScore === '') return total;
+            const scores = matchScores[match.id] ?? { homeScore: '', awayScore: '' };
+            if (scores.homeScore === '' || scores.awayScore === '') return total;
 
             const pred = userPreds.find((pr) => pr.match_id === match.id);
             if (!pred) return total;
 
             const type = getResultType(
               { homeScore: pred.home_score, awayScore: pred.away_score },
-              { homeScore: match.homeScore, awayScore: match.awayScore },
+              scores,
             );
             return total + getPoints(type, pool.scoringConfig);
           }, 0);
@@ -64,6 +77,7 @@ export default function StandingsScreen({ route }: any) {
         setRanking(calculated.sort((a, b) => b.points - a.points));
       } catch (e) {
         console.log('Error cargando clasificación:', e);
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
@@ -75,6 +89,14 @@ export default function StandingsScreen({ route }: any) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.errorText}>No se pudo cargar la clasificación.{'\n'}Verifica tu conexión e intenta de nuevo.</Text>
       </View>
     );
   }
@@ -113,7 +135,8 @@ export default function StandingsScreen({ route }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F1F5F9' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F5F9' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F5F9', padding: 24 },
+  errorText: { color: '#64748B', textAlign: 'center', fontSize: 14, lineHeight: 22 },
   list: { padding: 16 },
   tableHeader: {
     flexDirection: 'row',

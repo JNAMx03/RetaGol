@@ -6,7 +6,7 @@ import {
   Text,
   ActivityIndicator,
 } from 'react-native';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useApp, Match } from '../../../context/AppContext';
 import { supabase } from '../../../services/supabase';
 import MatchCard from '../../../components/MatchCard';
@@ -18,6 +18,18 @@ export default function PredictionsScreen({ route }: any) {
   const [loadingPreds, setLoadingPreds] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+
+  // Calcular cuáles partidos tienen resultado real en la BD.
+  // Usamos pool.matches (datos originales) para no confundir resultado con predicción.
+  const finishedIds = useMemo(() => {
+    return new Set(
+      (pool.matches as Match[])
+        .filter((m) => m.homeScore !== '' && m.awayScore !== '')
+        .map((m) => m.id)
+    );
+  }, [pool.matches]);
+
+  const finishedCount = finishedIds.size;
 
   // Cargar predicciones guardadas desde Supabase al entrar
   useEffect(() => {
@@ -59,7 +71,11 @@ export default function PredictionsScreen({ route }: any) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await savePredictionsByPool(pool.id, matches);
+      // Solo guardar partidos pendientes (sin resultado) donde el usuario ingresó al menos un marcador
+      const filledMatches = matches.filter(
+        (m) => !finishedIds.has(m.id) && (m.homeScore !== '' || m.awayScore !== '')
+      );
+      await savePredictionsByPool(pool.id, filledMatches);
       setSavedMsg(true);
       setTimeout(() => setSavedMsg(false), 2000);
     } catch (e) {
@@ -77,30 +93,55 @@ export default function PredictionsScreen({ route }: any) {
     );
   }
 
+  // Solo los partidos que aún no tienen resultado son editables
+  const pendingMatches = matches.filter((m) => !finishedIds.has(m.id));
+
   return (
     <View style={styles.container}>
       <FlatList
-        data={matches}
+        data={pendingMatches}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <MatchCard match={item} onChange={handleChange} />
         )}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>✅</Text>
+            <Text style={styles.emptyTitle}>Todo finalizado</Text>
+            <Text style={styles.emptyText}>
+              Todos los partidos de esta polla ya tienen resultado.{'\n'}
+              Ve a la pestaña Resultados para ver tus puntos.
+            </Text>
+          </View>
+        }
+        ListFooterComponent={
+          finishedCount > 0 && pendingMatches.length > 0 ? (
+            <View style={styles.finishedBanner}>
+              <Text style={styles.finishedIcon}>🔒</Text>
+              <Text style={styles.finishedText}>
+                {finishedCount} partido{finishedCount !== 1 ? 's' : ''} finalizado{finishedCount !== 1 ? 's' : ''} — ve a <Text style={styles.finishedLink}>Resultados</Text>
+              </Text>
+            </View>
+          ) : null
+        }
       />
 
-      <View style={styles.footer}>
-        {savedMsg && <Text style={styles.savedMsg}>Predicciones guardadas</Text>}
-        <TouchableOpacity
-          style={[styles.btn, saving && styles.btnDisabled]}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving
-            ? <ActivityIndicator color="white" />
-            : <Text style={styles.btnText}>✓  Guardar</Text>
-          }
-        </TouchableOpacity>
-      </View>
+      {pendingMatches.length > 0 && (
+        <View style={styles.footer}>
+          {savedMsg && <Text style={styles.savedMsg}>Predicciones guardadas ✓</Text>}
+          <TouchableOpacity
+            style={[styles.btn, saving && styles.btnDisabled]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            {saving
+              ? <ActivityIndicator color="white" />
+              : <Text style={styles.btnText}>✓  Guardar</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -119,6 +160,44 @@ const styles = StyleSheet.create({
   list: {
     padding: 16,
   },
+
+  // Estado vacío (todos finalizados)
+  empty: {
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 24,
+  },
+  emptyIcon: { fontSize: 48, marginBottom: 14 },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: '#64748B',
+    textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 21,
+  },
+
+  // Banner inferior de partidos finalizados
+  finishedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 4,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  finishedIcon: { fontSize: 14 },
+  finishedText: { fontSize: 13, color: '#64748B', flex: 1 },
+  finishedLink: { color: '#2563EB', fontWeight: '600' },
+
+  // Footer con botón guardar
   footer: {
     padding: 16,
     backgroundColor: 'white',
