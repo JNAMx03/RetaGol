@@ -33,21 +33,21 @@ Stack (AppNavigator)
 
 | Área | Estado | Notas |
 |---|---|---|
-| Auth (Login/Register) | ✅ Completo | Supabase Auth con perfil automático vía trigger |
-| Home con menú lateral | ✅ Completo | — |
+| Auth (Login/Register) | ✅ Completo | Supabase Auth con perfil automático vía trigger; errores traducidos al español |
+| Home con menú lateral | ✅ Completo | Refresh al volver a focus vía `navigation.addListener` |
 | Pool tabs (4 sub-tabs) | ✅ Completo | — |
-| Crear polla con torneos reales (football-data.org) | ✅ Completo | Solo torneos no iniciados con fixtures; resumen al seleccionar |
+| Crear polla con torneos reales (football-data.org) | ✅ Completo | Filtra partidos TBD (equipos sin asignar); resumen al seleccionar torneo |
 | Scoring configurable por polla | ✅ Completo | Guardado en `pools.scoring_config` (jsonb) |
 | Partidos guardados con `api_id` real | ✅ Completo | Permite sync automático vía Edge Function |
-| Edge Function `sync-results` | ✅ Completo | Desplegada; activada por pull-to-refresh en ResultsScreen |
-| Predicciones | ✅ Completo | Upsert en Supabase |
-| Resultados con pull-to-refresh | ✅ Completo | Llama `sync-results` luego recarga marcadores |
-| Clasificación interna | ✅ Completo | Datos reales de Supabase |
-| Unirse a polla por código | ✅ Completo | Conectado con Supabase |
+| Edge Function `sync-results` | ✅ Completo | Desplegada; activada por pull-to-refresh en ResultsScreen; envía push al actualizar |
+| Predicciones | ✅ Completo | Upsert en Supabase; partidos finalizados ocultos/bloqueados |
+| Resultados con pull-to-refresh | ✅ Completo | Partidos con resultado al tope; llama `sync-results` antes de recargar |
+| Clasificación interna | ✅ Completo | Marcadores frescos desde Supabase (no stale data) |
+| Unirse a polla por código | ✅ Completo | Contador de participantes leído desde `pool_participants` (evita RLS) |
 | Results/Standings con scoring configurable | ✅ Completo | `getPoints(type, pool.scoringConfig)` en ResultsScreen y StandingsScreen |
-| Perfil con stats (menú lateral) | ⚠️ Parcial | Stats calculadas desde DB pendientes |
-| Notificaciones push — SDK + Edge Functions | ⚠️ Parcial | `react-native-onesignal` v5 instalado; `sync-results` envía push al actualizar; `send-reminders` (cron horario); `notify-join` (al unirse). Falta: `google-services.json` para FCM en Android, migración SQL (`onesignal_player_id`, `utc_date`), cron en Supabase, desplegar `send-reminders` y `notify-join` |
-| Dev build EAS | ✅ Completo | APK de desarrollo generado e instalado en Android físico |
+| Fase 4 — QA y pruebas | ✅ Completo | Todos los flujos probados en dispositivo físico Android con 2 usuarios |
+| Notificaciones push — SDK + Firebase FCM | ⚠️ Parcial | `react-native-onesignal` v5, `onesignal-expo-plugin` y `google-services.json` configurados; falta: rebuild EAS con FCM, desplegar `send-reminders` y `notify-join`, configurar cron en Supabase |
+| Dev build EAS | ⚠️ Pendiente rebuild | APK anterior instalado; rebuild necesario para activar FCM: `eas build --profile development --platform android` |
 | Build producción y Google Play | ❌ Pendiente | EAS — Fase 5 |
 
 ---
@@ -522,9 +522,12 @@ Activación:
 ### 3C.1 Configurar OneSignal ✅
 
 - `react-native-onesignal` v5.4.5 instalado
+- `onesignal-expo-plugin` instalado y configurado en `app.json` (con `mode: "development"`)
 - App ID: configurado en `.env` como `EXPO_PUBLIC_ONESIGNAL_APP_ID`
 - REST API Key: secreto de Supabase `ONESIGNAL_REST_API_KEY` (solo servidor)
-- **Nota:** `react-native-onesignal` v5 no tiene Expo config plugin — se quitó de `app.json`. La entrega en Android requiere agregar `google-services.json` (Firebase FCM) en la Fase 5
+- Firebase FCM: proyecto Firebase creado, `google-services.json` en raíz del proyecto, `googleServicesFile` en `app.json`
+- Cuenta de servicio Firebase subida a OneSignal (FCM v1)
+- **Pendiente:** `eas build --profile development --platform android` para activar FCM en el dispositivo
 
 ### 3C.2 Inicializar OneSignal en App.tsx ✅
 
@@ -538,23 +541,20 @@ Activación:
 | Recordatorio partido | `send-reminders` (cron horario, 1h antes) | ✅ Implementado — falta desplegar y configurar cron |
 | Alguien se unió a tu polla | `notify-join` llamado desde `joinPool()` | ✅ Implementado — falta desplegar |
 
-### 3C.4 Pendiente para activar notificaciones en producción
-
-```sql
--- Migraciones en Supabase SQL Editor:
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS onesignal_player_id TEXT;
-ALTER TABLE matches   ADD COLUMN IF NOT EXISTS utc_date TEXT;
-```
+### 3C.4 Pendiente para activar notificaciones completamente
 
 ```bash
-# Desplegar nuevas Edge Functions:
+# 1. Rebuild dev con Firebase FCM (ya configurado en app.json):
+eas build --profile development --platform android
+
+# 2. Desplegar Edge Functions pendientes:
 supabase functions deploy send-reminders
 supabase functions deploy notify-join
-supabase functions deploy sync-results  -- ya actualizado con notificaciones
+# sync-results ya está desplegado y envía push al actualizar resultados
 ```
 
 ```sql
--- Cron para send-reminders (cada hora):
+-- 3. Cron para send-reminders (cada hora) — ejecutar en Supabase SQL Editor:
 SELECT cron.schedule('send-match-reminders', '0 * * * *', $$
   SELECT net.http_post(
     url     := 'https://TU_PROYECTO.supabase.co/functions/v1/send-reminders',
@@ -564,7 +564,7 @@ SELECT cron.schedule('send-match-reminders', '0 * * * *', $$
 $$);
 ```
 
-Para entrega real en Android: agregar `google-services.json` de Firebase en Fase 5.
+> **Migraciones ya ejecutadas:** `profiles.onesignal_player_id` y `matches.utc_date` están en la BD.
 
 ---
 
@@ -573,50 +573,53 @@ Para entrega real en Android: agregar `google-services.json` de Firebase en Fase
 ### 4.1 Checklist de pruebas funcionales
 
 **Flujo de autenticación:**
-- [ ] Registro con email nuevo crea cuenta y redirige a Home
-- [ ] Login con credenciales correctas funciona
-- [ ] Login con credenciales incorrectas muestra error claro
-- [ ] La sesión persiste al cerrar y reabrir la app
-- [ ] Logout redirige a Login y limpia el estado
+- [x] Registro con email nuevo crea cuenta y redirige a Home
+- [x] Login con credenciales correctas funciona
+- [x] Login con credenciales incorrectas muestra error claro (traducido al español)
+- [x] La sesión persiste al cerrar y reabrir la app
+- [x] Logout redirige a Login y limpia el estado
 
 **Flujo de creación de polla:**
-- [ ] Seleccionar torneo carga los partidos reales desde football-data.org
-- [ ] Los partidos se muestran con equipos y fechas reales
-- [ ] Los puntajes configurables se guardan en `scoring_config` de la polla
-- [ ] Cada partido se guarda en Supabase con su `api_id` real
-- [ ] El código generado es único (verificar en Supabase)
-- [ ] La polla aparece en Home del creador
-- [ ] El creador aparece como participante
+- [x] Seleccionar torneo carga los partidos reales desde football-data.org
+- [x] Los partidos se muestran con equipos y fechas reales (equipos TBD filtrados)
+- [x] Los puntajes configurables se guardan en `scoring_config` de la polla
+- [x] Cada partido se guarda en Supabase con su `api_id` real
+- [x] El código generado es único (verificado en Supabase)
+- [x] La polla aparece en Home del creador
+- [x] El creador aparece como participante
 
 **Flujo de unirse a polla:**
-- [ ] Código válido navega a la polla
-- [ ] Código inválido muestra error
-- [ ] Intentar unirse a una polla en la que ya estás muestra aviso
-- [ ] La polla aparece en Home del nuevo participante
+- [x] Código válido navega a la polla
+- [x] Código inválido muestra error
+- [x] Intentar unirse a una polla en la que ya estás muestra aviso
+- [x] La polla aparece en Home del nuevo participante
+- [x] Contador de participantes se actualiza correctamente en ambos usuarios
 
 **Predicciones:**
-- [ ] Guardar predicciones persiste en Supabase
-- [ ] Reabrir la polla muestra las predicciones guardadas
-- [ ] Las predicciones de usuario A no aparecen en usuario B (no hay leakage)
-- [ ] Cambiar una predicción hace upsert, no crea duplicado
+- [x] Guardar predicciones persiste en Supabase
+- [x] Reabrir la polla muestra las predicciones guardadas
+- [x] Las predicciones de usuario A no aparecen en usuario B (no hay leakage)
+- [x] Cambiar una predicción hace upsert, no crea duplicado
+- [x] Partidos con resultado real se ocultan de la lista editable
 
 **Resultados y puntuación:**
-- [ ] Marcador exacto da 5 pts
-- [ ] Un marcador exacto (solo local o solo visitante) da 2 pts
-- [ ] Ganador/empate correcto da 1 pt
-- [ ] Diferencia correcta con ganador incorrecto da 1 pt
-- [ ] Sin acierto da 0 pts
-- [ ] Partido sin resultado muestra "Pdte."
+- [x] Marcador exacto da 5 pts
+- [x] Un marcador exacto (solo local o solo visitante) da 2 pts
+- [x] Ganador/empate correcto da 1 pt
+- [x] Diferencia correcta con ganador incorrecto da 1 pt
+- [x] Sin acierto da 0 pts
+- [x] Partido sin resultado muestra "Pdte."
+- [x] Partidos con resultado aparecen al tope de la lista
 
 **Clasificación:**
-- [ ] El usuario con más puntos aparece primero
-- [ ] El usuario actual se resalta en azul
-- [ ] Empates en puntos se rompen consistentemente
+- [x] El usuario con más puntos aparece primero
+- [x] El usuario actual se resalta en azul
+- [x] Empates en puntos se rompen consistentemente
 
 **Perfil:**
-- [ ] Muestra nombre y email del usuario autenticado
-- [ ] Número de pollas refleja las pollas reales
-- [ ] Logout funciona desde el perfil
+- [x] Muestra nombre y email del usuario autenticado
+- [x] Número de pollas refleja las pollas reales
+- [x] Logout funciona desde el perfil
 
 ### 4.2 Pruebas en dispositivo físico
 

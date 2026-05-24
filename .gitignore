@@ -44,7 +44,9 @@ yarn-error.*
 
 #claude
 #CLAUDE.md
-#ARQUITECTURA_RETAGOL.md
+#arch/ARQUITECTURA_RETAGOL.md
+#arch/V0_SETUP.md
+#arch/V1_SETUP.md
 
 # Firebase — la cuenta de servicio (clave privada) no va al repo
 # google-services.json sí se committea (solo contiene IDs públicos de Firebase)

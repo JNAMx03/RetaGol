@@ -180,7 +180,7 @@ ResultsScreen y StandingsScreen usan `getPoints(type, pool.scoringConfig)` — e
   - Exacto → `#16A34A` | Parcial → `#2563EB` | Ganador/Diff → `#EAB308` | Sin acierto → `#94A3B8`
 - **Comentarios**: escritos en español; mantener ese estilo al agregar comentarios
 - **Scoring**: usar siempre `getPoints(type, pool.scoringConfig)` — nunca `POINTS[type]` directamente. Ya implementado en ResultsScreen y StandingsScreen
-- **OneSignal**: subscription ID se guarda en `profiles.onesignal_player_id` al abrir la app. Las Edge Functions lo leen para enviar push. La entrega en Android requiere FCM (`google-services.json`) — pendiente para build de producción
+- **OneSignal**: subscription ID se guarda en `profiles.onesignal_player_id` al abrir la app. Las Edge Functions lo leen para enviar push. `google-services.json` configurado + `onesignal-expo-plugin` en `app.json` — requiere nuevo EAS build para activar FCM en el dispositivo
 - **Match.utcDate**: guardar siempre el ISO UTC de football-data.org junto con `date` (string formateado). `utcDate` es lo que usa `send-reminders` para comparar fechas en la BD
 - **API de partidos**: toda la lógica de football-data.org va en `services/footballDataApi.ts`. El `api_id` de cada partido es el `id` numérico de football-data.org — fundamental para que `sync-results` funcione
 - **Caché de partidos**: `matchCache` en footballDataApi.ts evita llamadas repetidas a la API dentro de la misma sesión
@@ -200,8 +200,8 @@ ResultsScreen y StandingsScreen usan `getPoints(type, pool.scoringConfig)` — e
 | Clasificación con datos reales de Supabase | ✅ Completo |
 | Unirse a polla por código | ✅ Completo |
 | Resultados/Clasificación respetando scoring configurable | ✅ Completo |
-| Notificaciones push (OneSignal) — SDK + Edge Functions | ⚠️ Parcial — SDK integrado, 3 Edge Functions creadas; falta Firebase FCM (`google-services.json`) para entrega en Android |
-| Dev build EAS instalado en Android | ✅ Completo — APK de desarrollo generado e instalado |
+| Notificaciones push (OneSignal) — SDK + Edge Functions | ⚠️ Parcial — SDK integrado, `sync-results` envía push; `google-services.json` + `onesignal-expo-plugin` configurados; falta: rebuild EAS con FCM, desplegar `send-reminders` y `notify-join`, configurar cron |
+| Dev build EAS | ⚠️ Pendiente rebuild — APK anterior instalado; hay que rebuild con Firebase FCM (`eas build --profile development --platform android`) |
 | Build producción y Google Play | ❌ Pendiente — Fase 5 |
 
 ## Roadmap (versiones futuras)
