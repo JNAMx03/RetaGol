@@ -9,12 +9,26 @@ import {
   TouchableWithoutFeedback,
   ScrollView,
 } from 'react-native';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp, Pool } from '../../context/AppContext';
 import PoolCard from '../../components/PoolCard';
 
 const MENU_WIDTH = Math.min(Dimensions.get('window').width * 0.82, 340);
+const NOTIF_WIDTH = Math.min(Dimensions.get('window').width * 0.88, 360);
+const READ_KEY = 'retagol_read_notifs';
+const DISMISSED_KEY = 'retagol_dismissed_notifs';
+
+interface NotifItem {
+  id: string;
+  type: 'result' | 'join';
+  emoji: string;
+  title: string;
+  body: string;
+  poolName: string;
+  read: boolean;
+}
 
 const SETTINGS_CUENTA = [
   { icon: '👤', label: 'Editar perfil', screen: 'EditProfile' },
@@ -30,9 +44,18 @@ const SETTINGS_APP = [
 
 export default function HomeScreen({ navigation }: any) {
   const { pools, user, logout, refreshPools, userStats } = useApp();
+
+  // ── Estado menú izquierdo ─────────────────────────────────────────────────
   const [menuOpen, setMenuOpen] = useState(false);
   const translateX = useRef(new Animated.Value(-MENU_WIDTH)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  // ── Estado panel de notificaciones (derecha) ──────────────────────────────
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifTranslateX = useRef(new Animated.Value(NOTIF_WIDTH)).current;
+  const notifOverlayOpacity = useRef(new Animated.Value(0)).current;
+  const [notifications, setNotifications] = useState<NotifItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Recargar pollas cada vez que Home recibe foco (ej. al volver de CreatePool, JoinPool, etc.)
   useEffect(() => {
@@ -41,6 +64,41 @@ export default function HomeScreen({ navigation }: any) {
     });
     return unsubscribe;
   }, [navigation]);
+
+  // Generar notificaciones a partir de resultados disponibles en las pollas
+  const loadNotifications = useCallback(async () => {
+    const readRaw = await AsyncStorage.getItem(READ_KEY);
+    const readIds: string[] = readRaw ? JSON.parse(readRaw) : [];
+
+    const dismissedRaw = await AsyncStorage.getItem(DISMISSED_KEY);
+    const dismissedIds: string[] = dismissedRaw ? JSON.parse(dismissedRaw) : [];
+
+    const items: NotifItem[] = [];
+    for (const pool of pools) {
+      for (const match of pool.matches) {
+        if (match.homeScore !== '' && match.awayScore !== '') {
+          const id = `result_${match.id}`;
+          if (dismissedIds.includes(id)) continue; // ya fue borrada
+          items.push({
+            id,
+            type: 'result',
+            emoji: '⚽',
+            title: 'Resultado disponible',
+            body: `${match.home}  ${match.homeScore} – ${match.awayScore}  ${match.away}`,
+            poolName: pool.name,
+            read: readIds.includes(id),
+          });
+        }
+      }
+    }
+
+    // Sin leer al tope
+    items.sort((a, b) => (a.read === b.read ? 0 : a.read ? 1 : -1));
+    setNotifications(items);
+    setUnreadCount(items.filter((n) => !n.read).length);
+  }, [pools]);
+
+  useEffect(() => { loadNotifications(); }, [loadNotifications]);
 
   const initials = (user?.name ?? 'U')
     .split(' ')
@@ -80,6 +138,60 @@ export default function HomeScreen({ navigation }: any) {
     ]).start(() => setMenuOpen(false));
   }
 
+  function openNotif() {
+    setNotifOpen(true);
+    Animated.parallel([
+      Animated.timing(notifTranslateX, { toValue: 0, duration: 260, useNativeDriver: true }),
+      Animated.timing(notifOverlayOpacity, { toValue: 1, duration: 260, useNativeDriver: true }),
+    ]).start();
+  }
+
+  function closeNotif() {
+    Animated.parallel([
+      Animated.timing(notifTranslateX, { toValue: NOTIF_WIDTH, duration: 220, useNativeDriver: true }),
+      Animated.timing(notifOverlayOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+    ]).start(() => setNotifOpen(false));
+  }
+
+  const markAllRead = async () => {
+    const ids = notifications.map((n) => n.id);
+    await AsyncStorage.setItem(READ_KEY, JSON.stringify(ids));
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
+  };
+
+  const markOneRead = async (id: string) => {
+    const readRaw = await AsyncStorage.getItem(READ_KEY);
+    const readIds: string[] = readRaw ? JSON.parse(readRaw) : [];
+    if (!readIds.includes(id)) {
+      readIds.push(id);
+      await AsyncStorage.setItem(READ_KEY, JSON.stringify(readIds));
+    }
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    );
+    setUnreadCount((c) => Math.max(0, c - 1));
+  };
+
+  const dismissOne = async (id: string) => {
+    const raw = await AsyncStorage.getItem(DISMISSED_KEY);
+    const ids: string[] = raw ? JSON.parse(raw) : [];
+    if (!ids.includes(id)) {
+      ids.push(id);
+      await AsyncStorage.setItem(DISMISSED_KEY, JSON.stringify(ids));
+    }
+    const updated = notifications.filter((n) => n.id !== id);
+    setNotifications(updated);
+    setUnreadCount(updated.filter((n) => !n.read).length);
+  };
+
+  const dismissAll = async () => {
+    const ids = notifications.map((n) => n.id);
+    await AsyncStorage.setItem(DISMISSED_KEY, JSON.stringify(ids));
+    setNotifications([]);
+    setUnreadCount(0);
+  };
+
   function handleMenuNav(screen: string) {
     closeMenu();
     // Pequeño delay para que la animación cierre antes de navegar
@@ -100,8 +212,17 @@ export default function HomeScreen({ navigation }: any) {
           <Text style={styles.menuIcon}>☰</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mis Pollas</Text>
-        <TouchableOpacity style={styles.iconBtn} activeOpacity={0.6}>
-          <Text style={styles.bellIcon}>🔔</Text>
+        <TouchableOpacity style={styles.iconBtn} onPress={openNotif} activeOpacity={0.6}>
+          <View>
+            <Text style={styles.bellIcon}>🔔</Text>
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unreadCount > 9 ? '9+' : String(unreadCount)}
+                </Text>
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -149,6 +270,84 @@ export default function HomeScreen({ navigation }: any) {
           <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]} />
         </TouchableWithoutFeedback>
       )}
+
+      {/* ── Overlay notificaciones ───────────────────────────────────────────── */}
+      {notifOpen && (
+        <TouchableWithoutFeedback onPress={closeNotif}>
+          <Animated.View style={[styles.overlay, { opacity: notifOverlayOpacity }]} />
+        </TouchableWithoutFeedback>
+      )}
+
+      {/* ── Panel de notificaciones (desliza desde la derecha) ────────────────── */}
+      <Animated.View style={[styles.notifPanel, { transform: [{ translateX: notifTranslateX }] }]}>
+        {/* Header */}
+        <View style={styles.notifHeader}>
+          <Text style={styles.notifTitle}>Notificaciones</Text>
+          <TouchableOpacity onPress={closeNotif} style={styles.notifCloseBtn}>
+            <Text style={styles.notifCloseIcon}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Barra de acciones — solo visible cuando hay notificaciones */}
+        {notifications.length > 0 && (
+          <View style={styles.notifActions}>
+            {unreadCount > 0 && (
+              <TouchableOpacity onPress={markAllRead} activeOpacity={0.7}>
+                <Text style={styles.notifActionBtn}>✓ Marcar leídas</Text>
+              </TouchableOpacity>
+            )}
+            {unreadCount > 0 && <Text style={styles.notifActionSep}>·</Text>}
+            <TouchableOpacity onPress={dismissAll} activeOpacity={0.7}>
+              <Text style={[styles.notifActionBtn, styles.notifActionDelete]}>
+                🗑 Borrar todas
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {notifications.length === 0 ? (
+          // ── Sin notificaciones ────────────────────────────────────────────
+          <View style={styles.notifEmpty}>
+            <Text style={styles.notifEmptyIcon}>🔕</Text>
+            <Text style={styles.notifEmptyTitle}>Sin notificaciones</Text>
+            <Text style={styles.notifEmptyDesc}>
+              Aquí aparecerán los resultados de tus pollas y otros avisos importantes.
+            </Text>
+          </View>
+        ) : (
+          // ── Lista de notificaciones ───────────────────────────────────────
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {notifications.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[styles.notifItem, item.read && styles.notifItemRead]}
+                onPress={() => markOneRead(item.id)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.notifDot, item.read && styles.notifDotRead]} />
+                <View style={styles.notifItemContent}>
+                  <Text style={styles.notifItemEmoji}>{item.emoji}</Text>
+                  <View style={styles.notifItemText}>
+                    <Text style={[styles.notifItemTitle, item.read && styles.notifItemTitleRead]}>
+                      {item.title}
+                    </Text>
+                    <Text style={styles.notifItemBody}>{item.body}</Text>
+                    <Text style={styles.notifItemPool}>📋 {item.poolName}</Text>
+                  </View>
+                </View>
+                {/* Botón borrar individual */}
+                <TouchableOpacity
+                  onPress={() => dismissOne(item.id)}
+                  style={styles.notifDeleteBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.notifDeleteIcon}>✕</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+      </Animated.View>
 
       {/* ── Panel lateral (siempre montado, fuera de pantalla hasta que abre) ── */}
       <Animated.View style={[styles.menuPanel, { transform: [{ translateX }] }]}>
@@ -490,4 +689,122 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 10,
   },
+
+  // ── Badge campanita ──────────────────────────────────────────────────────
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    backgroundColor: '#DC2626',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: { color: 'white', fontSize: 9, fontWeight: 'bold' },
+
+  // ── Panel notificaciones ─────────────────────────────────────────────────
+  notifPanel: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: NOTIF_WIDTH,
+    backgroundColor: '#F8FAFC',
+    zIndex: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: -4, height: 0 },
+    elevation: 12,
+  },
+  notifHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingTop: 48,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    gap: 8,
+  },
+  notifTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: '#0F172A' },
+  notifActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    gap: 8,
+  },
+  notifActionBtn: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
+  notifActionSep: { fontSize: 13, color: '#CBD5E1' },
+  notifActionDelete: { color: '#DC2626' },
+  notifCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
+  notifCloseIcon: { fontSize: 13, color: '#64748B', fontWeight: 'bold' },
+  notifEmpty: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  notifEmptyIcon: { fontSize: 52, marginBottom: 16 },
+  notifEmptyTitle: { fontSize: 17, fontWeight: 'bold', color: '#374151', marginBottom: 8 },
+  notifEmptyDesc: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 21,
+  },
+  notifItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  notifItemRead: { backgroundColor: '#F8FAFC' },
+  notifDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#2563EB',
+    marginTop: 5,
+    flexShrink: 0,
+  },
+  notifDotRead: { backgroundColor: 'transparent' },
+  notifItemContent: { flex: 1, flexDirection: 'row', gap: 10 },
+  notifItemEmoji: { fontSize: 22, marginTop: 1 },
+  notifItemText: { flex: 1 },
+  notifItemTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 3,
+  },
+  notifItemTitleRead: { color: '#64748B', fontWeight: '600' },
+  notifItemBody: { fontSize: 13, color: '#374151', marginBottom: 4, lineHeight: 18 },
+  notifItemPool: { fontSize: 11, color: '#94A3B8' },
+  notifDeleteBtn: {
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notifDeleteIcon: { fontSize: 12, color: '#CBD5E1', fontWeight: 'bold' },
 });
