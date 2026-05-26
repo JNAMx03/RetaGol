@@ -60,6 +60,7 @@ interface AppContextType {
   predictions: Record<string, Record<string, Match[]>>;
   getPredictionsByPool: (poolId: string) => Match[];
   savePredictionsByPool: (poolId: string, matches: Match[]) => Promise<void>;
+  updateProfile: (updates: { name?: string }) => Promise<void>;
   clearAllData: () => Promise<void>;
   loading: boolean;
 }
@@ -520,6 +521,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
   };
 
+  // ─── Perfil ─────────────────────────────────────────────────────────────────
+
+  const updateProfile = async (updates: { name?: string }) => {
+    if (!user) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id);
+    if (error) throw error;
+    setUser((prev) => (prev ? { ...prev, ...updates } : prev));
+  };
+
   // ─── Debug ──────────────────────────────────────────────────────────────────
 
   const clearAllData = async () => {
@@ -548,6 +561,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         recoveryMode,
         clearRecoveryMode,
         userStats,
+        updateProfile,
         login,
         register,
         loginWithGoogle,

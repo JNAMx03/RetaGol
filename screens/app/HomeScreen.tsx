@@ -17,15 +17,15 @@ import PoolCard from '../../components/PoolCard';
 const MENU_WIDTH = Math.min(Dimensions.get('window').width * 0.82, 340);
 
 const SETTINGS_CUENTA = [
-  { icon: '👤', label: 'Editar perfil' },
-  { icon: '🔔', label: 'Notificaciones' },
-  { icon: '🔒', label: 'Privacidad y seguridad' },
+  { icon: '👤', label: 'Editar perfil', screen: 'EditProfile' },
+  { icon: '🔔', label: 'Notificaciones', screen: 'Notifications' },
+  { icon: '🔒', label: 'Privacidad y seguridad', screen: 'Security' },
 ];
 
 const SETTINGS_APP = [
-  { icon: '🌐', label: 'Idioma' },
-  { icon: '❓', label: 'Ayuda y soporte' },
-  { icon: 'ℹ️', label: 'Acerca de la app' },
+  { icon: '🌐', label: 'Idioma', screen: 'Language' },
+  { icon: '❓', label: 'Ayuda y soporte', screen: 'Help' },
+  { icon: 'ℹ️', label: 'Acerca de la app', screen: 'About' },
 ];
 
 export default function HomeScreen({ navigation }: any) {
@@ -78,6 +78,12 @@ export default function HomeScreen({ navigation }: any) {
         useNativeDriver: true,
       }),
     ]).start(() => setMenuOpen(false));
+  }
+
+  function handleMenuNav(screen: string) {
+    closeMenu();
+    // Pequeño delay para que la animación cierre antes de navegar
+    setTimeout(() => navigation.navigate(screen), 240);
   }
 
   function handleLogout() {
@@ -204,6 +210,7 @@ export default function HomeScreen({ navigation }: any) {
                   styles.menuSettingRow,
                   i < SETTINGS_CUENTA.length - 1 && styles.menuRowBorder,
                 ]}
+                onPress={() => handleMenuNav(item.screen)}
                 activeOpacity={0.6}
               >
                 <View style={styles.menuSettingLeft}>
@@ -227,6 +234,7 @@ export default function HomeScreen({ navigation }: any) {
                   styles.menuSettingRow,
                   i < SETTINGS_APP.length - 1 && styles.menuRowBorder,
                 ]}
+                onPress={() => handleMenuNav(item.screen)}
                 activeOpacity={0.6}
               >
                 <View style={styles.menuSettingLeft}>

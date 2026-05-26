@@ -9,6 +9,12 @@ import HomeScreen from '../screens/app/HomeScreen';
 import CreatePoolScreen from '../screens/app/CreatePoolScreen';
 import JoinPoolScreen from '../screens/app/JoinPoolScreen';
 import PoolTabsNavigator from './PoolTabsNavigator';
+import EditProfileScreen from '../screens/app/settings/EditProfileScreen';
+import NotificationsScreen from '../screens/app/settings/NotificationsScreen';
+import SecurityScreen from '../screens/app/settings/SecurityScreen';
+import LanguageScreen from '../screens/app/settings/LanguageScreen';
+import HelpScreen from '../screens/app/settings/HelpScreen';
+import AboutScreen from '../screens/app/settings/AboutScreen';
 import { useApp } from '../context/AppContext';
 
 const Stack = createNativeStackNavigator();
@@ -43,6 +49,13 @@ export default function AppNavigator() {
             <Stack.Screen name="CreatePool" component={CreatePoolScreen} />
             <Stack.Screen name="JoinPool" component={JoinPoolScreen} />
             <Stack.Screen name="PoolDetail" component={PoolTabsNavigator} />
+            {/* Pantallas de configuración */}
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="Security" component={SecurityScreen} />
+            <Stack.Screen name="Language" component={LanguageScreen} />
+            <Stack.Screen name="Help" component={HelpScreen} />
+            <Stack.Screen name="About" component={AboutScreen} />
           </>
         )}
       </Stack.Navigator>
