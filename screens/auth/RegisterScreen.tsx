@@ -26,6 +26,12 @@ export default function RegisterScreen({ navigation }: any) {
   const [error, setError] = useState('');
   const [verifyEmail, setVerifyEmail] = useState(false);
 
+  const canRegister =
+    fullName.trim().length > 0 &&
+    email.trim().length > 0 &&
+    password.trim().length > 0 &&
+    confirm.trim().length > 0;
+
   const handleRegister = async () => {
     if (!fullName.trim() || !email.trim() || !password.trim()) return;
     if (password !== confirm) {
@@ -176,9 +182,9 @@ export default function RegisterScreen({ navigation }: any) {
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <TouchableOpacity
-              style={[styles.btnPrimary, loading && styles.btnDisabled]}
+              style={[styles.btnPrimary, (!canRegister || loading) && styles.btnDisabled]}
               onPress={handleRegister}
-              disabled={loading}
+              disabled={!canRegister || loading}
             >
               {loading
                 ? <ActivityIndicator color="white" />

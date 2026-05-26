@@ -23,6 +23,8 @@ export default function LoginScreen({ navigation }: any) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const canLogin = email.trim().length > 0 && password.trim().length > 0;
+
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) return;
     setError('');
@@ -121,9 +123,9 @@ export default function LoginScreen({ navigation }: any) {
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <TouchableOpacity
-              style={[styles.btnPrimary, loading && styles.btnDisabled]}
+              style={[styles.btnPrimary, (!canLogin || loading) && styles.btnDisabled]}
               onPress={handleLogin}
-              disabled={loading}
+              disabled={!canLogin || loading}
             >
               {loading
                 ? <ActivityIndicator color="white" />
