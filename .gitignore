@@ -47,6 +47,6 @@ CLAUDE.md
 arch/
 .claude/
 
-# Firebase — la cuenta de servicio (clave privada) no va al repo
-# google-services.json sí se committea (solo contiene IDs públicos de Firebase)
+# Firebase — ningún archivo de credenciales va al repo
+google-services.json
 /retagol-27ccf-firebase-adminsdk-fbsvc-cbd2e3d263.json
