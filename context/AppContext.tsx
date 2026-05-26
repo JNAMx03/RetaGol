@@ -1,7 +1,11 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as WebBrowser from 'expo-web-browser';
+import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '../services/supabase';
 import { ScoringConfig, DEFAULT_SCORING } from '../utils/scoring';
+
+WebBrowser.maybeCompleteAuthSession();
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +44,7 @@ interface AppContextType {
   isLogged: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   pools: Pool[];
   refreshPools: () => Promise<void>;
@@ -179,6 +184,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
     if (error) throw error;
 
+    // Si Supabase requiere confirmación de correo, session viene null
+    if (!data.session) {
+      throw new Error('VERIFY_EMAIL');
+    }
+
     const userId = data.user!.id;
     let profile = null;
     for (let i = 0; i < 3; i++) {
@@ -196,6 +206,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIsLogged(false);
     setUser(null);
     setPools([]);
+  };
+
+  const loginWithGoogle = async () => {
+    const redirectTo = makeRedirectUri({ scheme: 'retagol', path: 'auth/callback' });
+
+    // 1. Obtener la URL de OAuth de Supabase
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+    if (error) throw error;
+
+    // 2. Abrir el navegador con la URL de Google
+    const result = await WebBrowser.openAuthSessionAsync(data.url!, redirectTo);
+    if (result.type !== 'success') return;
+
+    // 3. Extraer tokens del hash de la URL de retorno
+    const hash = result.url.split('#')[1] ?? '';
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    if (!accessToken || !refreshToken) return;
+
+    // 4. Establecer sesión en Supabase
+    const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (sessionError) throw sessionError;
+
+    // 5. Cargar perfil y pollas
+    const userId = sessionData.user?.id;
+    if (!userId) return;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (profile) {
+      setUser(profile);
+      setIsLogged(true);
+      await loadPoolsForUser(userId);
+    }
   };
 
   // ─── Pollas ─────────────────────────────────────────────────────────────────
@@ -358,6 +413,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         isLogged,
         login,
         register,
+        loginWithGoogle,
         logout,
         pools,
         refreshPools,

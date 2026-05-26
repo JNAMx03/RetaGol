@@ -16,10 +16,11 @@ import { useApp } from '../../context/AppContext';
 import { translateError } from '../../utils/errorMessages';
 
 export default function LoginScreen({ navigation }: any) {
-  const { login } = useApp();
+  const { login, loginWithGoogle } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleLogin = async () => {
@@ -32,6 +33,18 @@ export default function LoginScreen({ navigation }: any) {
       setError(translateError(e));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+    } catch (e) {
+      setError(translateError(e));
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -55,6 +68,28 @@ export default function LoginScreen({ navigation }: any) {
           {/* Tarjeta del formulario */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Iniciar Sesión</Text>
+
+            {/* Botón Google */}
+            <TouchableOpacity
+              style={[styles.btnGoogle, googleLoading && styles.btnDisabled]}
+              onPress={handleGoogle}
+              disabled={googleLoading || loading}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color="#374151" />
+              ) : (
+                <>
+                  <Text style={styles.btnGoogleIcon}>G</Text>
+                  <Text style={styles.btnGoogleText}>Continuar con Google</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>o con correo</Text>
+              <View style={styles.dividerLine} />
+            </View>
 
             <Text style={styles.label}>Correo Electrónico</Text>
             <TextInput
@@ -151,8 +186,51 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#0F172A',
     textAlign: 'center',
-    marginBottom: 22,
+    marginBottom: 18,
   },
+
+  // Botón Google
+  btnGoogle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'white',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingVertical: 13,
+    gap: 10,
+    marginBottom: 16,
+  },
+  btnGoogleIcon: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#EA4335',
+  },
+  btnGoogleText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
+  },
+
+  // Divisor
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+    gap: 10,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dividerText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
+
   label: {
     fontSize: 13,
     fontWeight: '600',
