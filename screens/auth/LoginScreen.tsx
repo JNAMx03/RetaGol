@@ -8,6 +8,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
@@ -42,9 +43,11 @@ export default function LoginScreen({ navigation }: any) {
       >
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           {/* Logo */}
-          <View style={styles.avatar}>
-            <Text style={styles.avatarIcon}>⚽</Text>
-          </View>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
 
           <Text style={styles.appName}>RetaGol</Text>
           <Text style={styles.appSubtitle}>Predice y compite con tus amigos</Text>
@@ -119,20 +122,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  logo: {
+    width: 120,
+    height: 120,
     alignSelf: 'center',
     marginBottom: 14,
-  },
-  avatarIcon: {
-    fontSize: 36,
-    color: 'white',
-    fontWeight: 'bold',
   },
   appName: {
     color: 'white',
