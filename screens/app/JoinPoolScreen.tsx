@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
@@ -49,40 +50,45 @@ export default function JoinPoolScreen({ navigation }: any) {
         <View style={{ width: 40 }} />
       </View>
 
-      <View style={styles.content}>
-        <View style={styles.plusCircle}>
-          <Text style={styles.plusIcon}>+</Text>
-        </View>
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid
+        extraScrollHeight={20}
+      >
+          <View style={styles.plusCircle}>
+            <Text style={styles.plusIcon}>+</Text>
+          </View>
 
-        <Text style={styles.description}>
-          Ingresa el código de la polla para unirte
-        </Text>
+          <Text style={styles.description}>
+            Ingresa el código de la polla para unirte
+          </Text>
 
-        <Text style={styles.label}>Código de Polla</Text>
-        <TextInput
-          placeholder="Ej. CH2026"
-          placeholderTextColor="#94A3B8"
-          value={code}
-          onChangeText={(t) => { setCode(t.toUpperCase()); setError(''); }}
-          style={styles.input}
-          autoCapitalize="characters"
-          maxLength={8}
-          editable={!loading}
-        />
+          <Text style={styles.label}>Código de Polla</Text>
+          <TextInput
+            placeholder="Ej. CH2026"
+            placeholderTextColor="#94A3B8"
+            value={code}
+            onChangeText={(t) => { setCode(t.toUpperCase()); setError(''); }}
+            style={styles.input}
+            autoCapitalize="characters"
+            maxLength={8}
+            editable={!loading}
+          />
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <TouchableOpacity
-          style={[styles.btn, (!canJoin || loading) && styles.btnDisabled]}
-          onPress={handleJoin}
-          disabled={!canJoin || loading}
-        >
-          {loading
-            ? <ActivityIndicator color="white" />
-            : <Text style={styles.btnText}>Unirse</Text>
-          }
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={[styles.btn, (!canJoin || loading) && styles.btnDisabled]}
+            onPress={handleJoin}
+            disabled={!canJoin || loading}
+          >
+            {loading
+              ? <ActivityIndicator color="white" />
+              : <Text style={styles.btnText}>Unirse</Text>
+            }
+          </TouchableOpacity>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

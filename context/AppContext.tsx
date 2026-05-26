@@ -1,11 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as WebBrowser from 'expo-web-browser';
-import { makeRedirectUri } from 'expo-auth-session';
 import { supabase } from '../services/supabase';
 import { ScoringConfig, DEFAULT_SCORING } from '../utils/scoring';
-
-WebBrowser.maybeCompleteAuthSession();
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -209,6 +205,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithGoogle = async () => {
+    // Importar módulos nativos de forma lazy — solo cuando el usuario los necesita.
+    // Así la app no crashea al arrancar si el build no los incluye aún.
+    const WebBrowser = await import('expo-web-browser');
+    const { makeRedirectUri } = await import('expo-auth-session');
+
+    WebBrowser.maybeCompleteAuthSession();
+
     const redirectTo = makeRedirectUri({ scheme: 'retagol', path: 'auth/callback' });
 
     // 1. Obtener la URL de OAuth de Supabase

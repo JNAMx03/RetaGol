@@ -31,6 +31,8 @@ module.exports = {
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
+      // Hace que el teclado empuje el contenido hacia arriba en lugar de taparlo
+      softwareKeyboardLayoutMode: 'pan',
     },
     web: {
       favicon: './assets/favicon.png',
