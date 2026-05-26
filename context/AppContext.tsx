@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
-import { ScoringConfig, DEFAULT_SCORING } from '../utils/scoring';
+import { ScoringConfig, DEFAULT_SCORING, getResultType, getPoints } from '../utils/scoring';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -35,9 +36,19 @@ export interface User {
   email: string;
 }
 
+export interface UserStats {
+  totalPoints: number;
+  totalCorrect: number;
+  totalExact: number;
+  totalPredictions: number;
+}
+
 interface AppContextType {
   user: User | null;
   isLogged: boolean;
+  recoveryMode: boolean;
+  clearRecoveryMode: () => void;
+  userStats: UserStats;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
@@ -87,9 +98,18 @@ const mapPool = (pool: any, matches: any[]): Pool => ({
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLogged, setIsLogged] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const [pools, setPools] = useState<Pool[]>([]);
   const [predictions, setPredictions] = useState<Record<string, Record<string, Match[]>>>({});
   const [loading, setLoading] = useState(true);
+  const [userStats, setUserStats] = useState<UserStats>({
+    totalPoints: 0,
+    totalCorrect: 0,
+    totalExact: 0,
+    totalPredictions: 0,
+  });
+
+  const clearRecoveryMode = () => setRecoveryMode(false);
 
   // Recuperar sesión, perfil y pollas al iniciar
   useEffect(() => {
@@ -118,8 +138,104 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     };
     loadData();
+
+    // Escuchar evento PASSWORD_RECOVERY de Supabase Auth
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoveryMode(true);
+        setLoading(false);
+      }
+    });
+
+    // Procesar deep link de recuperación de contraseña
+    // URL esperada: retagol://reset-password#access_token=...&refresh_token=...&type=recovery
+    const handleDeepLink = async (url: string | null) => {
+      if (!url || !url.includes('reset-password')) return;
+      const hash = url.split('#')[1] ?? '';
+      const params = new URLSearchParams(hash);
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+      if (!accessToken) return;
+      // Establecer sesión → dispara PASSWORD_RECOVERY en onAuthStateChange
+      await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken ?? '',
+      });
+    };
+
+    // Caso 1: app cerrada, abierta desde el link del correo
+    Linking.getInitialURL().then(handleDeepLink);
+
+    // Caso 2: app ya abierta en segundo plano
+    const linkSubscription = Linking.addEventListener('url', ({ url }) => handleDeepLink(url));
+
+    return () => {
+      authSubscription.unsubscribe();
+      linkSubscription.remove();
+    };
   }, []);
 
+
+  // Calcula estadísticas globales del usuario (puntos, aciertos, exactos)
+  const loadUserStats = async (userId: string, myPools: Pool[]) => {
+    if (myPools.length === 0) return;
+
+    // 1. Todas las predicciones del usuario
+    const { data: preds } = await supabase
+      .from('predictions')
+      .select('home_score, away_score, pool_id, match_id')
+      .eq('user_id', userId);
+
+    if (!preds || preds.length === 0) return;
+
+    // 2. Resultados reales de los partidos predichos (solo los que ya terminaron)
+    const matchIds = preds.map((p: any) => p.match_id);
+    const { data: matchResults } = await supabase
+      .from('matches')
+      .select('id, home_score, away_score')
+      .in('id', matchIds)
+      .not('home_score', 'is', null)
+      .not('away_score', 'is', null);
+
+    if (!matchResults || matchResults.length === 0) return;
+
+    const matchMap: Record<string, { homeScore: string; awayScore: string }> = {};
+    matchResults.forEach((m: any) => {
+      matchMap[m.id] = {
+        homeScore: String(m.home_score),
+        awayScore: String(m.away_score),
+      };
+    });
+
+    // 3. Calcular estadísticas
+    let totalPoints = 0;
+    let totalCorrect = 0;
+    let totalExact = 0;
+    let totalPredictions = 0;
+
+    for (const pred of preds) {
+      const result = matchMap[pred.match_id];
+      if (!result) continue; // partido sin resultado — no contar aún
+
+      const pool = myPools.find((p) => p.id === pred.pool_id);
+      const scoringConfig = pool?.scoringConfig ?? DEFAULT_SCORING;
+
+      const predInput = {
+        homeScore: String(pred.home_score ?? ''),
+        awayScore: String(pred.away_score ?? ''),
+      };
+
+      const type = getResultType(predInput, result);
+      const pts = getPoints(type, scoringConfig);
+
+      totalPredictions++;
+      totalPoints += pts;
+      if (pts > 0) totalCorrect++;
+      if (type === 'exact') totalExact++;
+    }
+
+    setUserStats({ totalPoints, totalCorrect, totalExact, totalPredictions });
+  };
 
   const loadPoolsForUser = async (userId: string) => {
     // 1. Cargar las pollas con sus partidos
@@ -153,6 +269,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
 
     setPools(myPools);
+
+    // Calcular estadísticas globales del usuario con las pollas recién cargadas
+    await loadUserStats(userId, myPools);
   };
 
   // ─── Autenticación ──────────────────────────────────────────────────────────
@@ -207,10 +326,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = async () => {
     // Importar módulos nativos de forma lazy — solo cuando el usuario los necesita.
     // Así la app no crashea al arrancar si el build no los incluye aún.
-    const WebBrowser = await import('expo-web-browser');
-    const { makeRedirectUri } = await import('expo-auth-session');
+    let WebBrowser: any;
+    let makeRedirectUri: any;
+    try {
+      WebBrowser = await import('expo-web-browser');
+      const aes = await import('expo-auth-session');
+      makeRedirectUri = aes.makeRedirectUri;
+    } catch {
+      throw new Error('GOOGLE_UNAVAILABLE');
+    }
 
-    WebBrowser.maybeCompleteAuthSession();
+    // Solo llamar si la función existe (puede no estarlo en builds sin módulo nativo)
+    if (typeof WebBrowser.maybeCompleteAuthSession === 'function') {
+      WebBrowser.maybeCompleteAuthSession();
+    } else {
+      throw new Error('GOOGLE_UNAVAILABLE');
+    }
 
     const redirectTo = makeRedirectUri({ scheme: 'retagol', path: 'auth/callback' });
 
@@ -414,6 +545,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         isLogged,
+        recoveryMode,
+        clearRecoveryMode,
+        userStats,
         login,
         register,
         loginWithGoogle,

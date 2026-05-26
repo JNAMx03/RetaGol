@@ -16,12 +16,6 @@ import PoolCard from '../../components/PoolCard';
 
 const MENU_WIDTH = Math.min(Dimensions.get('window').width * 0.82, 340);
 
-const FUTURE_FEATURES = [
-  { icon: '🧭', label: 'Explorar pollas', badge: 'V1.5' },
-  { icon: '🛍️', label: 'Tienda de comodines', badge: 'V2.0' },
-  { icon: '🏆', label: 'Ranking global', badge: 'V2.5' },
-];
-
 const SETTINGS_CUENTA = [
   { icon: '👤', label: 'Editar perfil' },
   { icon: '🔔', label: 'Notificaciones' },
@@ -35,7 +29,7 @@ const SETTINGS_APP = [
 ];
 
 export default function HomeScreen({ navigation }: any) {
-  const { pools, user, logout, refreshPools } = useApp();
+  const { pools, user, logout, refreshPools, userStats } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
   const translateX = useRef(new Animated.Value(-MENU_WIDTH)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -176,30 +170,28 @@ export default function HomeScreen({ navigation }: any) {
             </View>
             <View style={styles.menuStatDivider} />
             <View style={styles.menuStat}>
-              <Text style={styles.menuStatValue}>—</Text>
+              <Text style={styles.menuStatValue}>{userStats.totalPoints}</Text>
               <Text style={styles.menuStatLabel}>Puntos</Text>
             </View>
             <View style={styles.menuStatDivider} />
             <View style={styles.menuStat}>
-              <Text style={styles.menuStatValue}>—</Text>
-              <Text style={styles.menuStatLabel}>Victorias</Text>
+              <Text style={styles.menuStatValue}>{userStats.totalCorrect}</Text>
+              <Text style={styles.menuStatLabel}>Aciertos</Text>
             </View>
           </View>
 
-          {/* Funcionalidades futuras */}
-          <View style={styles.menuBlock}>
-            {FUTURE_FEATURES.map((f, i) => (
-              <View
-                key={f.label}
-                style={[styles.menuFutureRow, i < FUTURE_FEATURES.length - 1 && styles.menuRowBorder]}
-              >
-                <Text style={styles.menuFutureIcon}>{f.icon}</Text>
-                <Text style={styles.menuFutureLabel}>{f.label}</Text>
-                <View style={styles.menuFutureBadge}>
-                  <Text style={styles.menuFutureBadgeText}>{f.badge}</Text>
-                </View>
-              </View>
-            ))}
+          {/* Estadísticas secundarias */}
+          <View style={styles.menuSecondaryStats}>
+            <Text style={styles.menuSecondaryStat}>
+              ⭐ {userStats.totalExact} exactos
+            </Text>
+            <View style={styles.menuSecondaryDot} />
+            <Text style={styles.menuSecondaryStat}>
+              📊{' '}
+              {userStats.totalPredictions > 0
+                ? Math.round((userStats.totalCorrect / userStats.totalPredictions) * 100)
+                : 0}% precisión
+            </Text>
           </View>
 
           {/* Sección Cuenta */}
@@ -404,6 +396,24 @@ const styles = StyleSheet.create({
   menuStatValue: { fontSize: 18, fontWeight: 'bold', color: '#0F172A', marginBottom: 2 },
   menuStatLabel: { fontSize: 11, color: '#64748B' },
   menuStatDivider: { width: 1, backgroundColor: '#E2E8F0' },
+  menuSecondaryStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    gap: 6,
+  },
+  menuSecondaryStat: { fontSize: 12, color: '#64748B' },
+  menuSecondaryDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+  },
 
   // ── Menú: bloques ────────────────────────────────────
   menuBlock: {
@@ -427,23 +437,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-
-  // ── Menú: features futuras ───────────────────────────
-  menuFutureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  menuFutureIcon: { fontSize: 18, width: 28 },
-  menuFutureLabel: { flex: 1, fontSize: 14, color: '#374151' },
-  menuFutureBadge: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  menuFutureBadgeText: { fontSize: 11, color: '#64748B', fontWeight: '600' },
 
   // ── Menú: ajustes ────────────────────────────────────
   menuSettingRow: {

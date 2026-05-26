@@ -9,6 +9,23 @@ const AUTH_ERROR_MAP: Record<string, string> = {
   'signup requires a valid password':         'Ingresa una contraseña válida.',
   'network request failed':      'Sin conexión. Verifica tu internet e intenta de nuevo.',
   'fetch error':                  'Sin conexión. Verifica tu internet e intenta de nuevo.',
+  // Google / módulos nativos no disponibles en este build
+  'google_unavailable':          'Inicio con Google no disponible aún. Usa correo y contraseña.',
+  'expowebbrowser':              'Inicio con Google no disponible aún. Usa correo y contraseña.',
+  'native module':               'Inicio con Google no disponible aún. Usa correo y contraseña.',
+  'not a function':              'Inicio con Google no disponible aún. Usa correo y contraseña.',
+  // Límites de envío de correos
+  'email rate limit exceeded':   'Demasiados intentos. Espera unos minutos e intenta de nuevo.',
+  'rate limit':                  'Demasiados intentos. Espera unos minutos e intenta de nuevo.',
+  'too many requests':           'Demasiados intentos. Espera unos minutos e intenta de nuevo.',
+  // Sesión y tokens
+  'token has expired':           'El enlace ha expirado. Solicita uno nuevo.',
+  'invalid token':               'Enlace inválido. Solicita uno nuevo.',
+  'session not found':           'Sesión no encontrada. Inicia sesión de nuevo.',
+  'user not found':              'No existe una cuenta con ese correo.',
+  // Contraseña
+  'new password should be different': 'La nueva contraseña debe ser diferente a la actual.',
+  'same password':               'La nueva contraseña debe ser diferente a la actual.',
 };
 
 export function translateError(error: unknown): string {

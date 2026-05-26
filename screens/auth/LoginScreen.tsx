@@ -11,6 +11,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { supabase } from '../../services/supabase';
 import { translateError } from '../../utils/errorMessages';
 
 export default function LoginScreen({ navigation }: any) {
@@ -21,10 +22,18 @@ export default function LoginScreen({ navigation }: any) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Estado para recuperar contraseña
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotError, setForgotError] = useState('');
+
   const canLogin = email.trim().length > 0 && password.trim().length > 0;
+  const canSendReset = forgotEmail.trim().length > 0;
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) return;
+    if (!canLogin) return;
     setError('');
     setLoading(true);
     try {
@@ -48,6 +57,118 @@ export default function LoginScreen({ navigation }: any) {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!canSendReset) return;
+    setForgotError('');
+    setForgotLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        forgotEmail.trim(),
+        { redirectTo: 'retagol://reset-password' },
+      );
+      if (error) throw error;
+      setForgotSent(true);
+    } catch (e) {
+      setForgotError(translateError(e));
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const openForgot = () => {
+    // Pre-llenar con el correo del login si ya lo escribió
+    setForgotEmail(email.trim());
+    setForgotSent(false);
+    setForgotError('');
+    setShowForgot(true);
+  };
+
+  // ── Pantalla de recuperar contraseña ───────────────────────────────────────
+  if (showForgot) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <KeyboardAwareScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          enableOnAndroid
+          extraScrollHeight={20}
+        >
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.appName}>RetaGol</Text>
+          <Text style={styles.appSubtitle}>Predice y compite con tus amigos</Text>
+
+          <View style={styles.card}>
+            {forgotSent ? (
+              // ── Estado: correo enviado ──────────────────────────────────
+              <>
+                <Text style={styles.forgotIcon}>📧</Text>
+                <Text style={styles.cardTitle}>Revisa tu correo</Text>
+                <Text style={styles.forgotDesc}>
+                  Si existe una cuenta con{' '}
+                  <Text style={{ fontWeight: 'bold', color: '#0F172A' }}>
+                    {forgotEmail}
+                  </Text>
+                  , recibirás un enlace para restablecer tu contraseña.
+                </Text>
+                <TouchableOpacity
+                  style={styles.btnPrimary}
+                  onPress={() => setShowForgot(false)}
+                >
+                  <Text style={styles.btnPrimaryText}>Volver al inicio de sesión</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              // ── Estado: formulario de recuperación ─────────────────────
+              <>
+                <Text style={styles.cardTitle}>Recuperar contraseña</Text>
+                <Text style={styles.forgotDesc}>
+                  Ingresa tu correo y te enviaremos un enlace para crear una nueva contraseña.
+                </Text>
+
+                <Text style={styles.label}>Correo Electrónico</Text>
+                <TextInput
+                  placeholder="tu@email.com"
+                  placeholderTextColor="#94A3B8"
+                  value={forgotEmail}
+                  onChangeText={setForgotEmail}
+                  style={styles.input}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={!forgotLoading}
+                  autoFocus
+                />
+
+                {forgotError ? (
+                  <Text style={styles.error}>{forgotError}</Text>
+                ) : null}
+
+                <TouchableOpacity
+                  style={[styles.btnPrimary, (!canSendReset || forgotLoading) && styles.btnDisabled]}
+                  onPress={handleForgotPassword}
+                  disabled={!canSendReset || forgotLoading}
+                >
+                  {forgotLoading
+                    ? <ActivityIndicator color="white" />
+                    : <Text style={styles.btnPrimaryText}>Enviar enlace</Text>
+                  }
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => setShowForgot(false)}>
+                  <Text style={styles.backToLogin}>← Volver al inicio de sesión</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </KeyboardAwareScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Pantalla principal de login ────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAwareScrollView
@@ -56,92 +177,90 @@ export default function LoginScreen({ navigation }: any) {
         enableOnAndroid
         extraScrollHeight={20}
       >
-          {/* Logo */}
-          <Image
-            source={require('../../assets/logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
+        <Image
+          source={require('../../assets/logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+
+        <Text style={styles.appName}>RetaGol</Text>
+        <Text style={styles.appSubtitle}>Predice y compite con tus amigos</Text>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Iniciar Sesión</Text>
+
+          {/* Botón Google */}
+          <TouchableOpacity
+            style={[styles.btnGoogle, googleLoading && styles.btnDisabled]}
+            onPress={handleGoogle}
+            disabled={googleLoading || loading}
+          >
+            {googleLoading ? (
+              <ActivityIndicator color="#374151" />
+            ) : (
+              <>
+                <Text style={styles.btnGoogleIcon}>G</Text>
+                <Text style={styles.btnGoogleText}>Continuar con Google</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>o con correo</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <Text style={styles.label}>Correo Electrónico</Text>
+          <TextInput
+            placeholder="tu@email.com"
+            placeholderTextColor="#94A3B8"
+            value={email}
+            onChangeText={setEmail}
+            style={styles.input}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            editable={!loading}
           />
 
-          <Text style={styles.appName}>RetaGol</Text>
-          <Text style={styles.appSubtitle}>Predice y compite con tus amigos</Text>
+          <Text style={styles.label}>Contraseña</Text>
+          <TextInput
+            placeholder="••••••••"
+            placeholderTextColor="#94A3B8"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            style={styles.input}
+            editable={!loading}
+          />
 
-          {/* Tarjeta del formulario */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Iniciar Sesión</Text>
+          <TouchableOpacity onPress={openForgot}>
+            <Text style={styles.forgot}>¿Olvidaste tu contraseña?</Text>
+          </TouchableOpacity>
 
-            {/* Botón Google */}
-            <TouchableOpacity
-              style={[styles.btnGoogle, googleLoading && styles.btnDisabled]}
-              onPress={handleGoogle}
-              disabled={googleLoading || loading}
-            >
-              {googleLoading ? (
-                <ActivityIndicator color="#374151" />
-              ) : (
-                <>
-                  <Text style={styles.btnGoogleIcon}>G</Text>
-                  <Text style={styles.btnGoogleText}>Continuar con Google</Text>
-                </>
-              )}
-            </TouchableOpacity>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>o con correo</Text>
-              <View style={styles.dividerLine} />
-            </View>
+          <TouchableOpacity
+            style={[styles.btnPrimary, (!canLogin || loading) && styles.btnDisabled]}
+            onPress={handleLogin}
+            disabled={!canLogin || loading}
+          >
+            {loading
+              ? <ActivityIndicator color="white" />
+              : <Text style={styles.btnPrimaryText}>Iniciar Sesión</Text>
+            }
+          </TouchableOpacity>
 
-            <Text style={styles.label}>Correo Electrónico</Text>
-            <TextInput
-              placeholder="tu@email.com"
-              placeholderTextColor="#94A3B8"
-              value={email}
-              onChangeText={setEmail}
-              style={styles.input}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              editable={!loading}
-            />
+          <Text style={styles.noAccount}>¿No tienes cuenta?</Text>
 
-            <Text style={styles.label}>Contraseña</Text>
-            <TextInput
-              placeholder="••••••••"
-              placeholderTextColor="#94A3B8"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              style={styles.input}
-              editable={!loading}
-            />
-
-            <TouchableOpacity>
-              <Text style={styles.forgot}>¿Olvidaste tu contraseña?</Text>
-            </TouchableOpacity>
-
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-
-            <TouchableOpacity
-              style={[styles.btnPrimary, (!canLogin || loading) && styles.btnDisabled]}
-              onPress={handleLogin}
-              disabled={!canLogin || loading}
-            >
-              {loading
-                ? <ActivityIndicator color="white" />
-                : <Text style={styles.btnPrimaryText}>Iniciar Sesión</Text>
-              }
-            </TouchableOpacity>
-
-            <Text style={styles.noAccount}>¿No tienes cuenta?</Text>
-
-            <TouchableOpacity
-              style={styles.btnSecondary}
-              onPress={() => navigation.navigate('Register')}
-              disabled={loading}
-            >
-              <Text style={styles.btnSecondaryText}>Crear Cuenta</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.btnSecondary}
+            onPress={() => navigation.navigate('Register')}
+            disabled={loading}
+          >
+            <Text style={styles.btnSecondaryText}>Crear Cuenta</Text>
+          </TouchableOpacity>
+        </View>
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );
@@ -187,6 +306,27 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     textAlign: 'center',
     marginBottom: 18,
+  },
+
+  // Recuperar contraseña
+  forgotIcon: {
+    fontSize: 48,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  forgotDesc: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 20,
+  },
+  backToLogin: {
+    textAlign: 'center',
+    color: '#2563EB',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 16,
   },
 
   // Botón Google

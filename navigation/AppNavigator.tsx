@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
+import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
 import HomeScreen from '../screens/app/HomeScreen';
 import CreatePoolScreen from '../screens/app/CreatePoolScreen';
 import JoinPoolScreen from '../screens/app/JoinPoolScreen';
@@ -13,7 +14,7 @@ import { useApp } from '../context/AppContext';
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
-  const { isLogged, loading } = useApp();
+  const { isLogged, loading, recoveryMode } = useApp();
 
   if (loading) {
     return (
@@ -26,14 +27,17 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!isLogged ? (
-          // ── Flujo de autenticación ──────────────────────────────
+        {recoveryMode ? (
+          // ── Modo recuperación de contraseña (deep link del correo) ──
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        ) : !isLogged ? (
+          // ── Flujo de autenticación ──────────────────────────────────
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
           </>
         ) : (
-          // ── Flujo principal ─────────────────────────────────────
+          // ── Flujo principal ─────────────────────────────────────────
           <>
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="CreatePool" component={CreatePoolScreen} />
