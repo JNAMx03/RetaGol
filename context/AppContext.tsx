@@ -30,6 +30,7 @@ export interface Pool {
   name: string;
   type: string;
   code: string;
+  creatorId: string;   // para saber quién puede borrar la polla
   participants: number;
   matches: Match[];
   createdAt: string;
@@ -88,6 +89,7 @@ const mapPool = (pool: any, matches: any[]): Pool => ({
   name: pool.name,
   type: pool.type,
   code: pool.code,
+  creatorId: pool.creator_id ?? '',
   participants: pool.participants,
   createdAt: pool.created_at,
   // Mezclar con DEFAULT_SCORING para que pollas viejas (formato { exact, oneTeam, ... })

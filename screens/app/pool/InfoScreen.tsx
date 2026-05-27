@@ -1,12 +1,35 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator,
+} from 'react-native';
 import { useState } from 'react';
-import { Pool } from '../../../context/AppContext';
+import { CommonActions } from '@react-navigation/native';
+import { useApp, Pool } from '../../../context/AppContext';
+import { supabase } from '../../../services/supabase';
 import { getMaxMatchPoints } from '../../../utils/scoring';
 
-export default function InfoScreen({ route }: any) {
+// ─── Helper: fecha de expiración (último partido + 7 días) ────────────────────
+
+function getExpiryDate(pool: Pool): Date | null {
+  const utcDates = pool.matches
+    .map((m) => m.utcDate)
+    .filter(Boolean) as string[];
+  if (utcDates.length === 0) return null;
+  const lastUtc = utcDates.reduce((max, d) => (d > max ? d : max), '');
+  return new Date(new Date(lastUtc).getTime() + 7 * 24 * 60 * 60 * 1000);
+}
+
+function formatDate(d: Date): string {
+  return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// ─── Pantalla ─────────────────────────────────────────────────────────────────
+
+export default function InfoScreen({ route, navigation }: any) {
   const pool: Pool = route.params.pool;
+  const { user } = useApp();
   const [scoringOpen, setScoringOpen] = useState(false);
   const [prizeOpen, setPrizeOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const sc = pool.scoringConfig;
   const ch = pool.championConfig;
@@ -14,8 +37,67 @@ export default function InfoScreen({ route }: any) {
   const maxPts = getMaxMatchPoints(sc);
   const totalPrize = (pr?.entryFee ?? 0) * pool.participants;
 
+  const isCreator = user?.id === pool.creatorId;
+
+  // ¿Todos los partidos tienen resultado?
+  const allFinished =
+    pool.matches.length > 0 &&
+    pool.matches.every((m) => m.homeScore !== '' && m.awayScore !== '');
+
+  const expiryDate = allFinished ? getExpiryDate(pool) : null;
+
+  // ── Borrar polla ─────────────────────────────────────────────────────────────
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Borrar polla',
+      `¿Estás seguro de que quieres borrar "${pool.name}"?\n\nSe eliminarán todos los partidos, predicciones y datos de la polla. Esta acción es irreversible.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sí, borrar',
+          style: 'destructive',
+          onPress: confirmDelete,
+        },
+      ],
+    );
+  };
+
+  const confirmDelete = async () => {
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from('pools').delete().eq('id', pool.id);
+      if (error) throw error;
+
+      // Regresar al Home y refrescar la lista de pollas
+      navigation.dispatch(
+        CommonActions.reset({ index: 0, routes: [{ name: 'Home' }] }),
+      );
+    } catch {
+      Alert.alert('Error', 'No se pudo borrar la polla. Verifica tu conexión e intenta de nuevo.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────────────
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.list}>
+
+      {/* ── Banner de expiración (solo cuando el torneo ya terminó) ──────── */}
+      {allFinished && expiryDate && (
+        <View style={styles.expiryBanner}>
+          <Text style={styles.expiryIcon}>⏳</Text>
+          <View style={styles.expiryText}>
+            <Text style={styles.expiryTitle}>Torneo finalizado</Text>
+            <Text style={styles.expirySub}>
+              Esta polla se borrará automáticamente el{' '}
+              <Text style={styles.expiryDate}>{formatDate(expiryDate)}</Text>
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* ── Información general ─────────────────────────────────────────── */}
       <View style={styles.section}>
@@ -173,9 +255,32 @@ export default function InfoScreen({ route }: any) {
         </View>
       )}
 
+      {/* ── Zona peligrosa (solo creador) ────────────────────────────────── */}
+      {isCreator && (
+        <View style={styles.dangerZone}>
+          <Text style={styles.dangerTitle}>Zona del creador</Text>
+          <Text style={styles.dangerDesc}>
+            Solo tú puedes borrar esta polla. Esta acción eliminará todos los datos y no se puede deshacer.
+          </Text>
+          <TouchableOpacity
+            style={[styles.btnDelete, deleting && styles.btnDeleteDisabled]}
+            onPress={handleDelete}
+            disabled={deleting}
+            activeOpacity={0.8}
+          >
+            {deleting
+              ? <ActivityIndicator color="white" size="small" />
+              : <Text style={styles.btnDeleteText}>🗑  Borrar polla</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      )}
+
     </ScrollView>
   );
 }
+
+// ─── Componente auxiliar ──────────────────────────────────────────────────────
 
 function InfoRow({ label, value, valueStyle, last }: {
   label: string; value: string; valueStyle?: object; last?: boolean;
@@ -191,9 +296,25 @@ function InfoRow({ label, value, valueStyle, last }: {
   );
 }
 
+// ─── Estilos ──────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F1F5F9' },
-  list: { padding: 16 },
+  list: { padding: 16, paddingBottom: 40 },
+
+  // Banner de expiración
+  expiryBanner: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    backgroundColor: '#FFFBEB', borderRadius: 12, padding: 14, marginBottom: 12,
+    borderWidth: 1, borderColor: '#FDE68A', gap: 10,
+  },
+  expiryIcon: { fontSize: 20, marginTop: 1 },
+  expiryText: { flex: 1 },
+  expiryTitle: { fontSize: 13, fontWeight: '700', color: '#92400E', marginBottom: 2 },
+  expirySub: { fontSize: 12, color: '#92400E', lineHeight: 18 },
+  expiryDate: { fontWeight: '700' },
+
+  // Secciones
   section: {
     backgroundColor: 'white', borderRadius: 14, padding: 16, marginBottom: 12,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
@@ -232,4 +353,19 @@ const styles = StyleSheet.create({
   },
   prizePoolLabel: { fontSize: 14, color: '#92400E', fontWeight: '600' },
   prizePoolValue: { fontSize: 18, fontWeight: '800', color: '#92400E' },
+
+  // Zona peligrosa
+  dangerZone: {
+    backgroundColor: 'white', borderRadius: 14, padding: 16, marginTop: 4,
+    borderWidth: 1.5, borderColor: '#FEE2E2',
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1,
+  },
+  dangerTitle: { fontSize: 13, fontWeight: '700', color: '#DC2626', marginBottom: 6 },
+  dangerDesc: { fontSize: 13, color: '#64748B', lineHeight: 19, marginBottom: 14 },
+  btnDelete: {
+    backgroundColor: '#DC2626', borderRadius: 10, paddingVertical: 13,
+    alignItems: 'center',
+  },
+  btnDeleteDisabled: { opacity: 0.5 },
+  btnDeleteText: { color: 'white', fontWeight: '700', fontSize: 15 },
 });
