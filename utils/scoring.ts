@@ -112,11 +112,12 @@ export function getMatchBreakdown(
   const predOut = pH > pA ? 'H' : pH < pA ? 'A' : 'D';
   const realOut = rH > rA ? 'H' : rH < rA ? 'A' : 'D';
 
+  // Usar 0 como fallback por si algún campo del config llega undefined (pollas viejas)
   const breakdown: PointsBreakdown = {
-    resultado:      predOut === realOut                       ? config.resultado    : 0,
-    golesLocal:     pH === rH                                 ? config.golesLocal   : 0,
-    golesVisitante: pA === rA                                 ? config.golesVisitante : 0,
-    diferencia:     Math.abs(pH - pA) === Math.abs(rH - rA)  ? config.diferencia   : 0,
+    resultado:      predOut === realOut                       ? (config.resultado    ?? 0) : 0,
+    golesLocal:     pH === rH                                 ? (config.golesLocal   ?? 0) : 0,
+    golesVisitante: pA === rA                                 ? (config.golesVisitante ?? 0) : 0,
+    diferencia:     Math.abs(pH - pA) === Math.abs(rH - rA)  ? (config.diferencia   ?? 0) : 0,
     multiplied: false,
     total: 0,
   };

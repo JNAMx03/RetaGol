@@ -90,7 +90,16 @@ const mapPool = (pool: any, matches: any[]): Pool => ({
   code: pool.code,
   participants: pool.participants,
   createdAt: pool.created_at,
-  scoringConfig: pool.scoring_config ?? DEFAULT_SCORING,
+  // Mezclar con DEFAULT_SCORING para que pollas viejas (formato { exact, oneTeam, ... })
+  // no produzcan NaN al acceder a campos nuevos como resultado, golesLocal, etc.
+  scoringConfig: {
+    resultado:        pool.scoring_config?.resultado        ?? DEFAULT_SCORING.resultado,
+    golesLocal:       pool.scoring_config?.golesLocal       ?? DEFAULT_SCORING.golesLocal,
+    golesVisitante:   pool.scoring_config?.golesVisitante   ?? DEFAULT_SCORING.golesVisitante,
+    diferencia:       pool.scoring_config?.diferencia       ?? DEFAULT_SCORING.diferencia,
+    dobleEliminatoria: pool.scoring_config?.dobleEliminatoria ?? DEFAULT_SCORING.dobleEliminatoria,
+    bonusUnico:       pool.scoring_config?.bonusUnico       ?? DEFAULT_SCORING.bonusUnico,
+  },
   championConfig: pool.champion_config ?? DEFAULT_CHAMPION,
   prizeConfig: pool.prize_config ?? DEFAULT_PRIZE,
   matches: matches.map((m) => ({
