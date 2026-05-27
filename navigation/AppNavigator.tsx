@@ -9,6 +9,7 @@ import HomeScreen from '../screens/app/HomeScreen';
 import CreatePoolScreen from '../screens/app/CreatePoolScreen';
 import JoinPoolScreen from '../screens/app/JoinPoolScreen';
 import PoolTabsNavigator from './PoolTabsNavigator';
+import ChampionPredictionScreen from '../screens/app/pool/ChampionPredictionScreen';
 import EditProfileScreen from '../screens/app/settings/EditProfileScreen';
 import NotificationsScreen from '../screens/app/settings/NotificationsScreen';
 import SecurityScreen from '../screens/app/settings/SecurityScreen';
@@ -49,6 +50,7 @@ export default function AppNavigator() {
             <Stack.Screen name="CreatePool" component={CreatePoolScreen} />
             <Stack.Screen name="JoinPool" component={JoinPoolScreen} />
             <Stack.Screen name="PoolDetail" component={PoolTabsNavigator} />
+            <Stack.Screen name="ChampionPrediction" component={ChampionPredictionScreen} />
             {/* Pantallas de configuración */}
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="Notifications" component={NotificationsScreen} />

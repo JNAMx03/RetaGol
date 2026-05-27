@@ -2,11 +2,16 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
-import { ScoringConfig, DEFAULT_SCORING, getResultType, getPoints } from '../utils/scoring';
+import {
+  ScoringConfig, DEFAULT_SCORING,
+  ChampionConfig, DEFAULT_CHAMPION,
+  PrizeConfig, DEFAULT_PRIZE,
+  getMatchPoints,
+} from '../utils/scoring';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-export type { ScoringConfig };
+export type { ScoringConfig, ChampionConfig, PrizeConfig };
 
 export interface Match {
   id: string;
@@ -17,6 +22,7 @@ export interface Match {
   homeScore: string;
   awayScore: string;
   apiId?: number;
+  stage?: string;  // GROUP_STAGE, ROUND_OF_16, QUARTER_FINAL, etc.
 }
 
 export interface Pool {
@@ -28,6 +34,8 @@ export interface Pool {
   matches: Match[];
   createdAt: string;
   scoringConfig: ScoringConfig;
+  championConfig: ChampionConfig;
+  prizeConfig: PrizeConfig;
 }
 
 export interface User {
@@ -55,7 +63,7 @@ interface AppContextType {
   logout: () => Promise<void>;
   pools: Pool[];
   refreshPools: () => Promise<void>;
-  createPool: (name: string, type: string, matches: Match[], scoring: ScoringConfig) => Promise<void>;
+  createPool: (name: string, type: string, matches: Match[], scoring: ScoringConfig, champion: ChampionConfig, prize: PrizeConfig) => Promise<void>;
   joinPool: (code: string) => Promise<Pool>;
   predictions: Record<string, Record<string, Match[]>>;
   getPredictionsByPool: (poolId: string) => Match[];
@@ -83,6 +91,8 @@ const mapPool = (pool: any, matches: any[]): Pool => ({
   participants: pool.participants,
   createdAt: pool.created_at,
   scoringConfig: pool.scoring_config ?? DEFAULT_SCORING,
+  championConfig: pool.champion_config ?? DEFAULT_CHAMPION,
+  prizeConfig: pool.prize_config ?? DEFAULT_PRIZE,
   matches: matches.map((m) => ({
     id: m.id,
     home: m.home,
@@ -91,6 +101,7 @@ const mapPool = (pool: any, matches: any[]): Pool => ({
     utcDate: m.utc_date ?? undefined,
     homeScore: m.home_score ?? '',
     awayScore: m.away_score ?? '',
+    stage: m.stage ?? 'GROUP_STAGE',
   })),
 });
 
@@ -226,13 +237,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         awayScore: String(pred.away_score ?? ''),
       };
 
-      const type = getResultType(predInput, result);
-      const pts = getPoints(type, scoringConfig);
+      const pts = getMatchPoints(predInput, result, scoringConfig);
+      const isExact = predInput.homeScore === result.homeScore && predInput.awayScore === result.awayScore;
 
       totalPredictions++;
       totalPoints += pts;
       if (pts > 0) totalCorrect++;
-      if (type === 'exact') totalExact++;
+      if (isExact) totalExact++;
     }
 
     setUserStats({ totalPoints, totalCorrect, totalExact, totalPredictions });
@@ -390,21 +401,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Pollas ─────────────────────────────────────────────────────────────────
 
-  const createPool = async (name: string, type: string, matches: Match[], scoring: ScoringConfig) => {
+  const createPool = async (
+    name: string,
+    type: string,
+    matches: Match[],
+    scoring: ScoringConfig,
+    champion: ChampionConfig,
+    prize: PrizeConfig,
+  ) => {
     if (!user) return;
 
     const code = generateCode(type);
 
-    // 1. Insertar la polla con su scoring config
+    // 1. Insertar la polla con toda la configuración
     const { data: pool, error: poolError } = await supabase
       .from('pools')
-      .insert({ name, type, code, creator_id: user.id, scoring_config: scoring })
+      .insert({
+        name,
+        type,
+        code,
+        creator_id: user.id,
+        scoring_config: scoring,
+        champion_config: champion,
+        prize_config: prize,
+      })
       .select()
       .single();
 
     if (poolError) throw poolError;
 
-    // 2. Insertar partidos con api_id real de football-data.org
+    // 2. Insertar partidos con stage, api_id y fechas
     const matchRows = matches.map((m) => ({
       id: `${pool.id}_${m.apiId ?? m.id}`,
       pool_id: pool.id,
@@ -413,6 +439,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       date: m.date,
       utc_date: m.utcDate ?? null,
       api_id: m.apiId ?? null,
+      stage: m.stage ?? 'GROUP_STAGE',
     }));
 
     const { error: matchError } = await supabase.from('matches').insert(matchRows);
@@ -426,7 +453,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // 4. Actualizar estado local
     const newPool: Pool = mapPool(
-      { ...pool, scoring_config: scoring },
+      { ...pool, scoring_config: scoring, champion_config: champion, prize_config: prize },
       matchRows.map((m) => ({ ...m, home_score: null, away_score: null })),
     );
     setPools((prev) => [...prev, newPool]);

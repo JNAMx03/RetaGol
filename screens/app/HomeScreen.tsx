@@ -13,6 +13,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp, Pool } from '../../context/AppContext';
+import { supabase } from '../../services/supabase';
 import PoolCard from '../../components/PoolCard';
 
 const MENU_WIDTH = Math.min(Dimensions.get('window').width * 0.82, 340);
@@ -204,6 +205,26 @@ export default function HomeScreen({ navigation }: any) {
     setTimeout(() => logout(), 240);
   }
 
+  // Abrir detalle de polla; si tiene predicción de campeón activada y el
+  // usuario aún no ha hecho su elección, lo manda a ChampionPrediction primero.
+  async function handlePoolPress(pool: Pool) {
+    if (pool.championConfig?.enabled) {
+      const { data } = await supabase
+        .from('pool_champion_predictions')
+        .select('id')
+        .eq('pool_id', pool.id)
+        .eq('user_id', user?.id ?? '')
+        .maybeSingle();
+
+      if (!data) {
+        // Sin predicción guardada → ir a la pantalla de selección primero
+        navigation.navigate('ChampionPrediction', { pool });
+        return;
+      }
+    }
+    navigation.navigate('PoolDetail', { pool });
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       {/* ── Header ──────────────────────────────────── */}
@@ -234,7 +255,7 @@ export default function HomeScreen({ navigation }: any) {
         renderItem={({ item }: { item: Pool }) => (
           <PoolCard
             pool={item}
-            onPress={() => navigation.navigate('PoolDetail', { pool: item })}
+            onPress={() => handlePoolPress(item)}
           />
         )}
         ListEmptyComponent={

@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl }
 import { useState, useEffect } from 'react';
 import { useApp, Match } from '../../../context/AppContext';
 import { supabase } from '../../../services/supabase';
-import { getResultType, getPoints, BADGE_COLORS, BADGE_LABELS } from '../../../utils/scoring';
+import { getMatchBreakdown, getMaxMatchPoints, getBadgeColor } from '../../../utils/scoring';
 
 const SYNC_FUNCTION_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-results`;
 
@@ -33,24 +33,20 @@ export default function ResultsScreen({ route }: any) {
         setPredictions(map);
       }
 
-      // Cargar marcadores frescos desde la BD (columnas explícitas para evitar problemas con select *)
+      // Cargar marcadores frescos con stage
       const { data: freshMatches, error: matchError } = await supabase
         .from('matches')
-        .select('id, home, away, date, home_score, away_score')
+        .select('id, home, away, date, home_score, away_score, stage')
         .eq('pool_id', pool.id);
 
-      if (matchError) {
-        setLoadError(true);
-        return;
-      }
+      if (matchError) { setLoadError(true); return; }
 
       if (freshMatches && freshMatches.length > 0) {
-        // Ordenar: partidos con resultado primero, luego pendientes
         const sorted = [...freshMatches].sort((a, b) => {
-          const aHasResult = a.home_score != null && a.away_score != null;
-          const bHasResult = b.home_score != null && b.away_score != null;
-          if (aHasResult && !bHasResult) return -1;
-          if (!aHasResult && bHasResult) return 1;
+          const aHas = a.home_score != null && a.away_score != null;
+          const bHas = b.home_score != null && b.away_score != null;
+          if (aHas && !bHas) return -1;
+          if (!aHas && bHas) return 1;
           return 0;
         });
         setMatches(sorted.map((m) => ({
@@ -60,54 +56,36 @@ export default function ResultsScreen({ route }: any) {
           date: m.date,
           homeScore: m.home_score ?? '',
           awayScore: m.away_score ?? '',
+          stage: m.stage ?? 'GROUP_STAGE',
         })));
-      } else if (freshMatches && freshMatches.length === 0) {
-        // Supabase devolvió vacío — puede ser un problema de RLS
-        console.warn('[ResultsScreen] ⚠️ Supabase devolvió 0 matches para pool:', pool.id);
-        // Conservar pool.matches como fallback para no dejar pantalla vacía
       }
-    } catch (e) {
-      console.log('Error cargando resultados:', e);
+    } catch {
       setLoadError(true);
     }
   };
 
-  useEffect(() => {
-    fetchData().finally(() => setLoading(false));
-  }, []);
+  useEffect(() => { fetchData().finally(() => setLoading(false)); }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      // Pedir a la Edge Function que sincronice resultados desde API-Football
       await fetch(SYNC_FUNCTION_URL, {
         method: 'POST',
         headers: { Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}` },
       });
-    } catch (_) {
-      // Si la función falla, igual recargamos los datos locales
-    }
+    } catch (_) {}
     await fetchData();
     setRefreshing(false);
   };
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2563EB" />
-      </View>
-    );
-  }
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#2563EB" /></View>;
+  if (loadError) return (
+    <View style={styles.center}>
+      <Text style={styles.errorText}>No se pudieron cargar los resultados.{'\n'}Verifica tu conexión e intenta de nuevo.</Text>
+    </View>
+  );
 
-  if (loadError) {
-    return (
-      <View style={styles.center}>
-        <Text style={{ color: '#64748B', textAlign: 'center', fontSize: 14, lineHeight: 22 }}>
-          No se pudieron cargar los resultados.{'\n'}Verifica tu conexión e intenta de nuevo.
-        </Text>
-      </View>
-    );
-  }
+  const maxPts = getMaxMatchPoints(pool.scoringConfig);
 
   return (
     <ScrollView
@@ -119,40 +97,52 @@ export default function ResultsScreen({ route }: any) {
         const pred = predictions[match.id];
         const hasResult = match.homeScore !== '' && match.awayScore !== '';
         const result = hasResult ? { homeScore: match.homeScore, awayScore: match.awayScore } : undefined;
-        const type = getResultType(pred, result);
-        const points = getPoints(type, pool.scoringConfig);
-        const badgeColor = BADGE_COLORS[type];
-        const badgeLabel = BADGE_LABELS[type];
+        const breakdown = getMatchBreakdown(pred, result, pool.scoringConfig, match.stage);
+        const badgeColor = getBadgeColor(breakdown.total, maxPts);
+        const isKnockout = breakdown.multiplied;
 
         return (
           <View key={match.id} style={styles.card}>
-            <Text style={styles.date}>{match.date}</Text>
+            <View style={styles.cardTop}>
+              <Text style={styles.date}>{match.date}</Text>
+              {isKnockout && (
+                <View style={styles.knockoutBadge}>
+                  <Text style={styles.knockoutText}>⚡ Eliminatoria</Text>
+                </View>
+              )}
+            </View>
 
             <View style={styles.resultRow}>
               <View style={styles.matchInfo}>
                 {hasResult ? (
                   <Text style={styles.matchTitle}>
-                    {match.home} {match.homeScore} – {match.awayScore} {match.away}
+                    {match.home}  {match.homeScore} – {match.awayScore}  {match.away}
                   </Text>
                 ) : (
-                  <Text style={styles.matchTitle}>
-                    {match.home} vs {match.away}
-                  </Text>
+                  <Text style={styles.matchTitle}>{match.home} vs {match.away}</Text>
                 )}
-
                 <Text style={styles.prediction}>
                   Tu predicción:{' '}
-                  {pred
-                    ? `${pred.homeScore || '?'} – ${pred.awayScore || '?'}`
-                    : 'Sin predicción'}
+                  {pred ? `${pred.homeScore || '?'} – ${pred.awayScore || '?'}` : 'Sin predicción'}
                 </Text>
+
+                {/* Desglose de puntos */}
+                {hasResult && pred && breakdown.total > 0 && (
+                  <View style={styles.breakdown}>
+                    {breakdown.resultado > 0 && <Text style={styles.breakdownItem}>✓ Resultado +{breakdown.resultado}</Text>}
+                    {breakdown.golesLocal > 0 && <Text style={styles.breakdownItem}>✓ Goles local +{breakdown.golesLocal}</Text>}
+                    {breakdown.golesVisitante > 0 && <Text style={styles.breakdownItem}>✓ Goles visit. +{breakdown.golesVisitante}</Text>}
+                    {breakdown.diferencia > 0 && <Text style={styles.breakdownItem}>✓ Diferencia +{breakdown.diferencia}</Text>}
+                    {isKnockout && <Text style={[styles.breakdownItem, { color: '#7C3AED' }]}>⚡ ×2 eliminatoria</Text>}
+                  </View>
+                )}
               </View>
 
               <View style={[styles.badge, { backgroundColor: hasResult ? badgeColor : '#E2E8F0' }]}>
                 {hasResult ? (
                   <>
-                    <Text style={styles.badgePts}>{points} pt{points !== 1 ? 's' : ''}</Text>
-                    <Text style={styles.badgeLabel}>{badgeLabel}</Text>
+                    <Text style={styles.badgePts}>{breakdown.total}</Text>
+                    <Text style={styles.badgePtsLabel}>pts</Text>
                   </>
                 ) : (
                   <Text style={styles.badgePending}>Pdte.</Text>
@@ -168,36 +158,27 @@ export default function ResultsScreen({ route }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F1F5F9' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F5F9' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F5F9', padding: 24 },
+  errorText: { color: '#64748B', textAlign: 'center', fontSize: 14, lineHeight: 22 },
   list: { padding: 16 },
   card: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    backgroundColor: 'white', padding: 16, borderRadius: 14, marginBottom: 12,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
-  date: { fontSize: 12, color: '#94A3B8', marginBottom: 10 },
-  resultRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  date: { fontSize: 12, color: '#94A3B8' },
+  knockoutBadge: { backgroundColor: '#F5F3FF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  knockoutText: { fontSize: 11, color: '#7C3AED', fontWeight: '600' },
+  resultRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   matchInfo: { flex: 1, marginRight: 12 },
   matchTitle: { fontWeight: '700', color: '#0F172A', fontSize: 14, marginBottom: 5 },
-  prediction: { color: '#64748B', fontSize: 13 },
+  prediction: { color: '#64748B', fontSize: 13, marginBottom: 6 },
+  breakdown: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  breakdownItem: { fontSize: 11, color: '#16A34A', backgroundColor: '#F0FDF4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
   badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    minWidth: 58,
-    alignItems: 'center',
+    paddingHorizontal: 10, paddingVertical: 8, borderRadius: 20, minWidth: 56, alignItems: 'center',
   },
-  badgePts: { color: 'white', fontWeight: 'bold', fontSize: 13, lineHeight: 16 },
-  badgeLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 9, lineHeight: 12 },
+  badgePts: { color: 'white', fontWeight: 'bold', fontSize: 18, lineHeight: 22 },
+  badgePtsLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 10 },
   badgePending: { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
 });
