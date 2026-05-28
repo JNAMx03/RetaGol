@@ -11,6 +11,7 @@ import { useState, useMemo } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../../../context/AppContext';
 import { supabase } from '../../../services/supabase';
+import { getTeamName } from '../../../utils/teamNames';
 
 interface ChampionPick {
   champion: string;
@@ -114,7 +115,7 @@ export default function ChampionPredictionScreen({ route, navigation }: any) {
               {pick[pos] !== '' && (
                 <View style={styles.selectedBadge}>
                   <Text style={styles.selectedBadgeText} numberOfLines={1}>
-                    {pick[pos]}
+                    {getTeamName(pick[pos])}
                   </Text>
                 </View>
               )}
@@ -144,7 +145,7 @@ export default function ChampionPredictionScreen({ route, navigation }: any) {
                       ]}
                       numberOfLines={1}
                     >
-                      {team}
+                      {getTeamName(team)}
                     </Text>
                   </TouchableOpacity>
                 );

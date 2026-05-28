@@ -11,6 +11,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useApp, Match } from '../../../context/AppContext';
 import { supabase } from '../../../services/supabase';
 import { getMatchBreakdown, getMaxMatchPoints, getBadgeColor, getMatchPoints } from '../../../utils/scoring';
+import { getTeamName } from '../../../utils/teamNames';
 
 const SYNC_FUNCTION_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-results`;
 
@@ -241,7 +242,7 @@ export default function ResultsScreen({ route }: any) {
                   <View style={styles.resultRow}>
                     <View style={styles.matchInfo}>
                       <Text style={styles.matchTitle}>
-                        {match.home}  {match.homeScore} – {match.awayScore}  {match.away}
+                        {getTeamName(match.home)}  {match.homeScore} – {match.awayScore}  {getTeamName(match.away)}
                       </Text>
                       <Text style={styles.predLabel}>
                         Tu predicción:{' '}

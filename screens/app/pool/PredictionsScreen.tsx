@@ -10,6 +10,7 @@ import {
 import { useState, useEffect, useMemo } from 'react';
 import { useApp, Match } from '../../../context/AppContext';
 import { supabase } from '../../../services/supabase';
+import { getTeamName } from '../../../utils/teamNames';
 
 // ─── Helpers de fecha ─────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ function MatchItem({
     <View style={[styles.matchCard, isLast && styles.matchCardLast]}>
       <Text style={styles.matchDate}>{match.date}</Text>
       <View style={styles.matchRow}>
-        <Text style={styles.teamName} numberOfLines={2}>{match.home}</Text>
+        <Text style={styles.teamName} numberOfLines={2}>{getTeamName(match.home)}</Text>
         <View style={styles.scoreRow}>
           <TextInput
             style={styles.scoreInput}
@@ -65,7 +66,7 @@ function MatchItem({
             placeholderTextColor="#CBD5E1"
           />
         </View>
-        <Text style={[styles.teamName, styles.teamRight]} numberOfLines={2}>{match.away}</Text>
+        <Text style={[styles.teamName, styles.teamRight]} numberOfLines={2}>{getTeamName(match.away)}</Text>
       </View>
     </View>
   );

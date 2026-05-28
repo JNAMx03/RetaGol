@@ -17,7 +17,8 @@ export default function PoolTabsNavigator({ route, navigation }: any) {
       {/* Header con botón atrás y nombre de la polla */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>{'←'}</Text>
+          {/* Flecha dibujada con View — evita variaciones entre fuentes de distintos fabricantes */}
+          <View style={styles.backArrow} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{pool.name}</Text>
         <View style={{ width: 40 }} />
@@ -37,21 +38,41 @@ export default function PoolTabsNavigator({ route, navigation }: any) {
           name="Predicciones"
           component={PredictionsScreen}
           initialParams={{ pool }}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <Text style={[styles.tabIcon, { opacity: focused ? 1 : 0.4 }]}>✏️</Text>
+            ),
+          }}
         />
         <Tab.Screen
           name="Resultados"
           component={ResultsScreen}
           initialParams={{ pool }}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <Text style={[styles.tabIcon, { opacity: focused ? 1 : 0.4 }]}>✅</Text>
+            ),
+          }}
         />
         <Tab.Screen
           name="Clasificación"
           component={StandingsScreen}
           initialParams={{ pool }}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <Text style={[styles.tabIcon, { opacity: focused ? 1 : 0.4 }]}>🏆</Text>
+            ),
+          }}
         />
         <Tab.Screen
           name="Info"
           component={InfoScreen}
           initialParams={{ pool }}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <Text style={[styles.tabIcon, { opacity: focused ? 1 : 0.4 }]}>ℹ️</Text>
+            ),
+          }}
         />
       </Tab.Navigator>
     </SafeAreaView>
@@ -77,9 +98,14 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
   },
-  backIcon: {
-    fontSize: 22,
-    color: '#2563EB',
+  backArrow: {
+    width: 11,
+    height: 11,
+    borderLeftWidth: 2.5,
+    borderBottomWidth: 2.5,
+    borderColor: '#2563EB',
+    transform: [{ rotate: '45deg' }],
+    marginLeft: 8,   // compensa la rotación para que quede centrado visualmente
   },
   headerTitle: {
     flex: 1,
@@ -92,11 +118,15 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
     backgroundColor: 'white',
-    height: 56,
+    height: 62,
+    paddingBottom: 6,
+    paddingTop: 4,
   },
   tabLabel: {
     fontSize: 11,
     fontWeight: '500',
-    marginBottom: 4,
+  },
+  tabIcon: {
+    fontSize: 18,
   },
 });
