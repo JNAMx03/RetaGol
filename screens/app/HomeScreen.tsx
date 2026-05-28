@@ -486,7 +486,7 @@ export default function HomeScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F1F5F9' },
+  safe: { flex: 1, backgroundColor: '#F4EBD8' },
 
   // ── Header ───────────────────────────────────────────
   header: {
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#DADADA',
   },
   iconBtn: {
     width: 40,
@@ -541,11 +541,11 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: 'white',
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: '#DADADA',
   },
   btnCreate: {
     flex: 1,
-    backgroundColor: '#16A34A',
+    backgroundColor: '#149435',
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
@@ -554,12 +554,12 @@ const styles = StyleSheet.create({
   btnJoin: {
     flex: 1,
     borderWidth: 1.5,
-    borderColor: '#2563EB',
+    borderColor: '#149435',
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
   },
-  btnJoinText: { color: '#2563EB', fontWeight: 'bold', fontSize: 15 },
+  btnJoinText: { color: '#149435', fontWeight: 'bold', fontSize: 15 },
 
   // ── Overlay ──────────────────────────────────────────
   overlay: {
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     width: MENU_WIDTH,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FAF7F2',
     zIndex: 20,
     shadowColor: '#000',
     shadowOpacity: 0.18,
@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
 
   // ── Menú: avatar y datos ─────────────────────────────
   menuUserCard: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#149435',
     padding: 24,
     paddingTop: 36,
     alignItems: 'flex-start',
@@ -618,21 +618,21 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#DADADA',
   },
   menuStat: { flex: 1, alignItems: 'center' },
   menuStatValue: { fontSize: 18, fontWeight: 'bold', color: '#0F172A', marginBottom: 2 },
   menuStatLabel: { fontSize: 11, color: '#64748B' },
-  menuStatDivider: { width: 1, backgroundColor: '#E2E8F0' },
+  menuStatDivider: { width: 1, backgroundColor: '#DADADA' },
   menuSecondaryStats: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FAF7F2',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#DADADA',
     gap: 6,
   },
   menuSecondaryStat: { fontSize: 12, color: '#64748B' },
@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
   },
   menuRowBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: '#F4EBD8',
   },
   menuSectionTitle: {
     fontSize: 11,
@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 8,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#ECFDF5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -733,7 +733,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: 0,
     width: NOTIF_WIDTH,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FAF7F2',
     zIndex: 20,
     shadowColor: '#000',
     shadowOpacity: 0.18,
@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
     paddingTop: 48,
     paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#DADADA',
     gap: 8,
   },
   notifTitle: { flex: 1, fontSize: 18, fontWeight: 'bold', color: '#0F172A' },
@@ -760,17 +760,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#DADADA',
     gap: 8,
   },
-  notifActionBtn: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
+  notifActionBtn: { fontSize: 13, color: '#149435', fontWeight: '600' },
   notifActionSep: { fontSize: 13, color: '#CBD5E1' },
   notifActionDelete: { color: '#DC2626' },
   notifCloseBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F4EBD8',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 4,
@@ -795,17 +795,17 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: '#F4EBD8',
     paddingVertical: 14,
     paddingHorizontal: 16,
     gap: 10,
   },
-  notifItemRead: { backgroundColor: '#F8FAFC' },
+  notifItemRead: { backgroundColor: '#FAF7F2' },
   notifDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#149435',
     marginTop: 5,
     flexShrink: 0,
   },

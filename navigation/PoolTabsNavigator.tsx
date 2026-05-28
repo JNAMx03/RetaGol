@@ -28,7 +28,7 @@ export default function PoolTabsNavigator({ route, navigation }: any) {
       <Tab.Navigator
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: '#2563EB',
+          tabBarActiveTintColor: '#149435',
           tabBarInactiveTintColor: '#94A3B8',
           tabBarLabelStyle: styles.tabLabel,
           tabBarStyle: styles.tabBar,
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#DADADA',
   },
   backBtn: {
     width: 40,
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     height: 11,
     borderLeftWidth: 2.5,
     borderBottomWidth: 2.5,
-    borderColor: '#2563EB',
+    borderColor: '#149435',
     transform: [{ rotate: '45deg' }],
     marginLeft: 8,   // compensa la rotación para que quede centrado visualmente
   },
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: '#DADADA',
     backgroundColor: 'white',
     height: 62,
     paddingBottom: 6,

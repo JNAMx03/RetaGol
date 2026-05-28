@@ -86,8 +86,8 @@ export default function NotificationsScreen({ navigation }: any) {
               <Switch
                 value={prefs[item.key]}
                 onValueChange={() => toggle(item.key)}
-                trackColor={{ false: '#E2E8F0', true: '#BFDBFE' }}
-                thumbColor={prefs[item.key] ? '#2563EB' : '#94A3B8'}
+                trackColor={{ false: '#DADADA', true: '#A7F3D0' }}
+                thumbColor={prefs[item.key] ? '#149435' : '#94A3B8'}
               />
             </View>
           ))}
@@ -102,7 +102,7 @@ export default function NotificationsScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F1F5F9' },
+  safe: { flex: 1, backgroundColor: '#F4EBD8' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -110,10 +110,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#DADADA',
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  backIcon: { fontSize: 22, color: '#2563EB' },
+  backIcon: { fontSize: 22, color: '#149435' },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  rowBorder: { borderBottomWidth: 1, borderBottomColor: '#F4EBD8' },
   rowIcon: { fontSize: 22, width: 30, textAlign: 'center' },
   rowInfo: { flex: 1 },
   rowTitle: { fontSize: 14, fontWeight: '600', color: '#0F172A', marginBottom: 2 },

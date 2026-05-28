@@ -124,9 +124,9 @@ export default function InfoScreen({ route, navigation }: any) {
             {/* Puntos base */}
             <Text style={styles.subLabel}>Puntos por partido (aditivos)</Text>
             {[
-              { label: 'Resultado correcto (1X2)', pts: sc.resultado, color: '#2563EB' },
-              { label: 'Goles local exactos', pts: sc.golesLocal, color: '#16A34A' },
-              { label: 'Goles visitante exactos', pts: sc.golesVisitante, color: '#16A34A' },
+              { label: 'Resultado correcto (1X2)', pts: sc.resultado, color: '#149435' },
+              { label: 'Goles local exactos', pts: sc.golesLocal, color: '#149435' },
+              { label: 'Goles visitante exactos', pts: sc.golesVisitante, color: '#149435' },
               { label: 'Diferencia de goles exacta', pts: sc.diferencia, color: '#EAB308' },
             ].map((r) => (
               <View key={r.label} style={styles.scoringRow}>
@@ -299,7 +299,7 @@ function InfoRow({ label, value, valueStyle, last }: {
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F5F9' },
+  container: { flex: 1, backgroundColor: '#F4EBD8' },
   list: { padding: 16, paddingBottom: 40 },
 
   // Banner de expiración
@@ -326,13 +326,13 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9 },
   infoLabel: { color: '#64748B', fontSize: 14 },
   infoValue: { fontWeight: '600', color: '#0F172A', fontSize: 14 },
-  code: { color: '#2563EB', letterSpacing: 1.5 },
-  divider: { height: 1, backgroundColor: '#F1F5F9' },
+  code: { color: '#149435', letterSpacing: 1.5 },
+  divider: { height: 1, backgroundColor: '#F4EBD8' },
   subLabel: {
     fontSize: 11, fontWeight: '600', color: '#94A3B8',
     textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8,
   },
-  scoringRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  scoringRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#F4EBD8' },
   dot: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
   scoringLabel: { flex: 1, color: '#374151', fontSize: 13 },
   scoringPts: { fontWeight: '700', fontSize: 13 },
@@ -340,13 +340,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: '#F0FDF4', borderRadius: 8, padding: 12, marginTop: 8,
   },
-  maxLabel: { fontSize: 13, color: '#16A34A', fontWeight: '600', flex: 1 },
-  maxPts: { fontSize: 18, fontWeight: '800', color: '#16A34A' },
-  optRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  maxLabel: { fontSize: 13, color: '#149435', fontWeight: '600', flex: 1 },
+  maxPts: { fontSize: 18, fontWeight: '800', color: '#149435' },
+  optRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#F4EBD8' },
   optIcon: { fontSize: 16, marginRight: 8 },
   optText: { flex: 1, fontSize: 13, color: '#374151' },
-  optActive: { fontSize: 12, fontWeight: '700', color: '#16A34A', backgroundColor: '#F0FDF4', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
-  optPts: { fontSize: 13, fontWeight: '700', color: '#2563EB' },
+  optActive: { fontSize: 12, fontWeight: '700', color: '#149435', backgroundColor: '#F0FDF4', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+  optPts: { fontSize: 13, fontWeight: '700', color: '#149435' },
   prizePoolBox: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: '#FFFBEB', borderRadius: 8, padding: 14, marginVertical: 10,

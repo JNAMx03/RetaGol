@@ -73,7 +73,7 @@ export default function ResetPasswordScreen() {
                 Tu contraseña fue cambiada correctamente.{'\n'}
                 Serás redirigido al inicio de sesión.
               </Text>
-              <ActivityIndicator color="#2563EB" style={{ marginTop: 12 }} />
+              <ActivityIndicator color="#149435" style={{ marginTop: 12 }} />
             </>
           ) : (
             // ── Formulario ─────────────────────────────────────────────────
@@ -127,7 +127,7 @@ export default function ResetPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#2563EB' },
+  safe: { flex: 1, backgroundColor: '#149435' },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   logo: { width: 120, height: 120, alignSelf: 'center', marginBottom: 14 },
   appName: { color: 'white', fontSize: 26, fontWeight: 'bold', textAlign: 'center', marginBottom: 4 },
@@ -138,12 +138,12 @@ const styles = StyleSheet.create({
   successIcon: { fontSize: 48, textAlign: 'center', marginBottom: 12 },
   label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
   input: {
-    borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10,
+    borderWidth: 1, borderColor: '#DADADA', borderRadius: 10,
     paddingHorizontal: 14, paddingVertical: 12, fontSize: 15,
-    color: '#0F172A', backgroundColor: '#F8FAFC', marginBottom: 14,
+    color: '#0F172A', backgroundColor: '#FAF7F2', marginBottom: 14,
   },
   error: { color: '#DC2626', fontSize: 13, textAlign: 'center', marginBottom: 12 },
-  btn: { backgroundColor: '#2563EB', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  btn: { backgroundColor: '#149435', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: 'white', fontWeight: 'bold', fontSize: 15 },
 });

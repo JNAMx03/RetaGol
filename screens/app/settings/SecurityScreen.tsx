@@ -74,7 +74,7 @@ export default function SecurityScreen({ navigation }: any) {
                 </Text>
               </View>
               {loadingReset
-                ? <ActivityIndicator color="#2563EB" />
+                ? <ActivityIndicator color="#149435" />
                 : <Text style={styles.chevron}>›</Text>
               }
             </TouchableOpacity>
@@ -94,7 +94,7 @@ export default function SecurityScreen({ navigation }: any) {
                 Conectado como {user?.email}
               </Text>
             </View>
-            <View style={[styles.dot, { backgroundColor: '#16A34A' }]} />
+            <View style={[styles.dot, { backgroundColor: '#149435' }]} />
           </View>
         </View>
 
@@ -107,7 +107,7 @@ export default function SecurityScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F1F5F9' },
+  safe: { flex: 1, backgroundColor: '#F4EBD8' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -115,10 +115,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#DADADA',
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  backIcon: { fontSize: 22, color: '#2563EB' },
+  backIcon: { fontSize: 22, color: '#149435' },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#ECFDF5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   },
   successIcon: { fontSize: 28 },
   successInfo: { flex: 1 },
-  successTitle: { fontSize: 14, fontWeight: '600', color: '#16A34A', marginBottom: 4 },
+  successTitle: { fontSize: 14, fontWeight: '600', color: '#149435', marginBottom: 4 },
   successDesc: { fontSize: 13, color: '#64748B', lineHeight: 19 },
   hint: {
     fontSize: 12,

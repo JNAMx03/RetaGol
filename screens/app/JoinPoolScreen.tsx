@@ -96,7 +96,7 @@ export default function JoinPoolScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F4EBD8',
   },
   header: {
     flexDirection: 'row',
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#DADADA',
   },
   backBtn: {
     width: 40,
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
   },
   backIcon: {
     fontSize: 22,
-    color: '#2563EB',
+    color: '#149435',
   },
   headerTitle: {
     flex: 1,
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 2,
-    borderColor: '#16A34A',
+    borderColor: '#149435',
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   },
   plusIcon: {
     fontSize: 52,
-    color: '#16A34A',
+    color: '#149435',
     lineHeight: 60,
   },
   description: {
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#DADADA',
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   btn: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#149435',
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',

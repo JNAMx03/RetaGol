@@ -125,7 +125,7 @@ export default function StandingsScreen({ route }: any) {
     fetchStandings();
   }, []);
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#2563EB" /></View>;
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#149435" /></View>;
   if (loadError) return (
     <View style={styles.center}>
       <Text style={styles.errorText}>No se pudo cargar la clasificación.{'\n'}Verifica tu conexión e intenta de nuevo.</Text>
@@ -142,7 +142,7 @@ export default function StandingsScreen({ route }: any) {
 
       {ranking.map((p, index) => {
         const isMe = p.id === user?.id;
-        const badgeColor = PODIUM_COLORS[index] ?? '#E2E8F0';
+        const badgeColor = PODIUM_COLORS[index] ?? '#DADADA';
         const total = p.points + p.bonusPoints;
 
         return (
@@ -169,8 +169,8 @@ export default function StandingsScreen({ route }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F5F9' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F1F5F9', padding: 24 },
+  container: { flex: 1, backgroundColor: '#F4EBD8' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F4EBD8', padding: 24 },
   errorText: { color: '#64748B', textAlign: 'center', fontSize: 14, lineHeight: 22 },
   list: { padding: 16 },
   tableHeader: {
@@ -185,13 +185,13 @@ const styles = StyleSheet.create({
     padding: 14, borderRadius: 12, marginBottom: 8,
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
-  rowMe: { borderWidth: 2, borderColor: '#2563EB' },
+  rowMe: { borderWidth: 2, borderColor: '#149435' },
   posBadge: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   posText: { fontWeight: 'bold', fontSize: 14, color: '#1E293B' },
   nameWrap: { flex: 1 },
   nameText: { fontSize: 15, color: '#0F172A', fontWeight: '500' },
-  nameMe: { color: '#2563EB', fontWeight: '700' },
+  nameMe: { color: '#149435', fontWeight: '700' },
   bonusText: { fontSize: 11, color: '#D97706', marginTop: 1 },
   ptsText: { fontSize: 15, fontWeight: '700', color: '#0F172A', width: 50, textAlign: 'right' },
-  ptsMe: { color: '#2563EB' },
+  ptsMe: { color: '#149435' },
 });

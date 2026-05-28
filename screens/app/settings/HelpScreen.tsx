@@ -97,7 +97,7 @@ export default function HelpScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F1F5F9' },
+  safe: { flex: 1, backgroundColor: '#F4EBD8' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -105,10 +105,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#DADADA',
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  backIcon: { fontSize: 22, color: '#2563EB' },
+  backIcon: { fontSize: 22, color: '#149435' },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 20,
   },
-  itemBorder: { borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  itemBorder: { borderBottomWidth: 1, borderBottomColor: '#F4EBD8' },
   faqRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#ECFDF5',
     justifyContent: 'center',
     alignItems: 'center',
   },

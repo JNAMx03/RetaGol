@@ -183,7 +183,7 @@ export default function PredictionsScreen({ route }: any) {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   if (loadingPreds) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#2563EB" /></View>;
+    return <View style={styles.center}><ActivityIndicator size="large" color="#149435" /></View>;
   }
 
   if (pendingMatches.length === 0) {
@@ -291,10 +291,10 @@ export default function PredictionsScreen({ route }: any) {
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F5F9' },
+  container: { flex: 1, backgroundColor: '#F4EBD8' },
   center: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
-    backgroundColor: '#F1F5F9', paddingHorizontal: 24,
+    backgroundColor: '#F4EBD8', paddingHorizontal: 24,
   },
   scroll: { padding: 12, paddingBottom: 24 },
 
@@ -312,18 +312,18 @@ const styles = StyleSheet.create({
 
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#2563EB', borderRadius: 12,
+    backgroundColor: '#DADADA', borderRadius: 12,
     paddingHorizontal: 16, paddingVertical: 13,
   },
   sectionHeaderOpen: {
     borderBottomLeftRadius: 0, borderBottomRightRadius: 0,
   },
   sectionTitle: {
-    fontSize: 14, fontWeight: '700', color: 'white',
+    fontSize: 14, fontWeight: '700', color: '#374151',
   },
-  sectionSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
+  sectionSub: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
   sectionRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  chevron: { fontSize: 12, color: 'rgba(255,255,255,0.8)' },
+  chevron: { fontSize: 12, color: '#64748B' },
 
   // Badge de progreso X/Y
   progressBadge: {
@@ -331,17 +331,17 @@ const styles = StyleSheet.create({
   },
   progressText: { fontSize: 12, fontWeight: '700' },
   badgeGreen: { backgroundColor: '#F0FDF4', borderColor: '#86EFAC' },
-  textGreen: { color: '#16A34A' },
+  textGreen: { color: '#149435' },
   badgeYellow: { backgroundColor: '#FEFCE8', borderColor: '#FDE047' },
   textYellow: { color: '#CA8A04' },
-  badgeGray: { backgroundColor: 'rgba(255,255,255,0.2)', borderColor: 'rgba(255,255,255,0.3)' },
-  textGray: { color: 'rgba(255,255,255,0.8)' },
+  badgeGray: { backgroundColor: 'rgba(0,0,0,0.06)', borderColor: 'rgba(0,0,0,0.15)' },
+  textGray: { color: '#64748B' },
 
   // ── Tarjeta de partido (embebida, sin sombra propia) ────────────────────────
   matchCard: {
     backgroundColor: 'white',
     paddingHorizontal: 16, paddingVertical: 13,
-    borderTopWidth: 1, borderTopColor: '#F1F5F9',
+    borderTopWidth: 1, borderTopColor: '#F4EBD8',
   },
   matchCardLast: {
     borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
@@ -352,27 +352,27 @@ const styles = StyleSheet.create({
   teamRight: { textAlign: 'right' },
   scoreRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 },
   scoreInput: {
-    width: 42, height: 42, backgroundColor: '#F1F5F9',
+    width: 42, height: 42, backgroundColor: '#F4EBD8',
     textAlign: 'center', borderRadius: 8, fontSize: 17, fontWeight: 'bold',
-    color: '#0F172A', borderWidth: 1.5, borderColor: '#E2E8F0',
+    color: '#0F172A', borderWidth: 1.5, borderColor: '#DADADA',
   },
   vs: { fontWeight: 'bold', marginHorizontal: 6, color: '#64748B', fontSize: 18 },
 
   // Banner de partidos finalizados
   finishedBanner: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12,
-    gap: 8, borderWidth: 1, borderColor: '#E2E8F0', marginTop: 2,
+    backgroundColor: '#FAF7F2', borderRadius: 10, padding: 12,
+    gap: 8, borderWidth: 1, borderColor: '#DADADA', marginTop: 2,
   },
   finishedText: { fontSize: 13, color: '#64748B', flex: 1 },
 
   // Footer con botón guardar
   footer: {
     padding: 16, backgroundColor: 'white',
-    borderTopWidth: 1, borderTopColor: '#E2E8F0',
+    borderTopWidth: 1, borderTopColor: '#DADADA',
   },
-  savedMsg: { textAlign: 'center', color: '#16A34A', fontWeight: '600', fontSize: 13, marginBottom: 8 },
-  btn: { backgroundColor: '#16A34A', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  savedMsg: { textAlign: 'center', color: '#149435', fontWeight: '600', fontSize: 13, marginBottom: 8 },
+  btn: { backgroundColor: '#149435', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: 'white', fontWeight: 'bold', fontSize: 15 },
 });

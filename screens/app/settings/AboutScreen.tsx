@@ -78,7 +78,7 @@ export default function AboutScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F1F5F9' },
+  safe: { flex: 1, backgroundColor: '#F4EBD8' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -86,10 +86,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#DADADA',
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  backIcon: { fontSize: 22, color: '#2563EB' },
+  backIcon: { fontSize: 22, color: '#149435' },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
@@ -107,12 +107,12 @@ const styles = StyleSheet.create({
   appName: { fontSize: 24, fontWeight: 'bold', color: '#0F172A', marginBottom: 4 },
   appTagline: { fontSize: 14, color: '#64748B', marginBottom: 12 },
   versionBadge: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#ECFDF5',
     paddingHorizontal: 14,
     paddingVertical: 5,
     borderRadius: 20,
   },
-  versionText: { fontSize: 13, color: '#2563EB', fontWeight: '600' },
+  versionText: { fontSize: 13, color: '#149435', fontWeight: '600' },
   card: {
     backgroundColor: 'white',
     borderRadius: 14,
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 10,
   },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  rowBorder: { borderBottomWidth: 1, borderBottomColor: '#F4EBD8' },
   linkIcon: { fontSize: 18, width: 28 },
   linkLabel: { flex: 1, fontSize: 14, color: '#0F172A' },
   chevron: { fontSize: 22, color: '#CBD5E1' },

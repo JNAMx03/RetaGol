@@ -177,8 +177,8 @@ export default function ChampionPredictionScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F1F5F9' },
-  header: { backgroundColor: '#2563EB', paddingHorizontal: 20, paddingVertical: 18 },
+  safe: { flex: 1, backgroundColor: '#F4EBD8' },
+  header: { backgroundColor: '#149435', paddingHorizontal: 20, paddingVertical: 18 },
   headerTitle: { fontSize: 22, fontWeight: '800', color: 'white' },
   headerSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   scroll: { flex: 1 },
@@ -186,11 +186,11 @@ const styles = StyleSheet.create({
 
   introBox: {
     flexDirection: 'row', alignItems: 'flex-start',
-    backgroundColor: '#EFF6FF', borderRadius: 12, padding: 14, marginBottom: 16,
+    backgroundColor: '#ECFDF5', borderRadius: 12, padding: 14, marginBottom: 16,
     gap: 10,
   },
   introIcon: { fontSize: 22, marginTop: 1 },
-  introText: { flex: 1, fontSize: 13, color: '#1E40AF', lineHeight: 20 },
+  introText: { flex: 1, fontSize: 13, color: '#0A5C1F', lineHeight: 20 },
 
   section: {
     backgroundColor: 'white', borderRadius: 14, padding: 16, marginBottom: 12,
@@ -204,29 +204,29 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
   sectionPts: { fontSize: 12, color: '#64748B', marginTop: 1 },
   selectedBadge: {
-    marginLeft: 'auto', backgroundColor: '#DBEAFE', borderRadius: 8,
+    marginLeft: 'auto', backgroundColor: '#D1FAE5', borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 4, maxWidth: 120,
   },
-  selectedBadgeText: { fontSize: 12, color: '#1D4ED8', fontWeight: '700' },
+  selectedBadgeText: { fontSize: 12, color: '#0D7A2A', fontWeight: '700' },
 
   teamGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   teamBtn: {
     paddingHorizontal: 12, paddingVertical: 7,
-    borderRadius: 8, borderWidth: 1.5, borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
+    borderRadius: 8, borderWidth: 1.5, borderColor: '#DADADA',
+    backgroundColor: '#FAF7F2',
   },
   teamBtnSelected: {
-    backgroundColor: '#2563EB', borderColor: '#2563EB',
+    backgroundColor: '#149435', borderColor: '#149435',
   },
   teamBtnTaken: {
-    borderColor: '#F1F5F9', backgroundColor: '#F8FAFC', opacity: 0.4,
+    borderColor: '#F4EBD8', backgroundColor: '#FAF7F2', opacity: 0.4,
   },
   teamBtnText: { fontSize: 13, color: '#374151', fontWeight: '500' },
   teamBtnTextSelected: { color: 'white', fontWeight: '700' },
   teamBtnTextTaken: { color: '#94A3B8' },
 
   btnSave: {
-    backgroundColor: '#2563EB', borderRadius: 14, padding: 16,
+    backgroundColor: '#149435', borderRadius: 14, padding: 16,
     alignItems: 'center', marginTop: 8,
   },
   btnSaveDisabled: { opacity: 0.6 },

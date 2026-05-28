@@ -206,7 +206,7 @@ export default function RegisterScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#16A34A',
+    backgroundColor: '#05C147',
   },
   scroll: {
     flexGrow: 1,
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'white',
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: '#DADADA',
     borderRadius: 10,
     paddingVertical: 13,
     gap: 10,
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#DADADA',
   },
   dividerText: {
     fontSize: 12,
@@ -288,13 +288,13 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#DADADA',
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
     color: '#0F172A',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FAF7F2',
     marginBottom: 14,
   },
   error: {
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   btnPrimary: {
-    backgroundColor: '#16A34A',
+    backgroundColor: '#149435',
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   loginLinkBold: {
-    color: '#16A34A',
+    color: '#149435',
     fontWeight: 'bold',
   },
 
@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   verifyBtnText: {
-    color: '#16A34A',
+    color: '#149435',
     fontWeight: 'bold',
     fontSize: 15,
   },

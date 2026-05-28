@@ -179,8 +179,8 @@ export default function CreatePoolScreen({ navigation }: any) {
       <Switch
         value={value}
         onValueChange={onToggle}
-        trackColor={{ false: '#E2E8F0', true: '#BFDBFE' }}
-        thumbColor={value ? '#2563EB' : '#94A3B8'}
+        trackColor={{ false: '#DADADA', true: '#A7F3D0' }}
+        thumbColor={value ? '#149435' : '#94A3B8'}
       />
     </View>
   );
@@ -224,7 +224,7 @@ export default function CreatePoolScreen({ navigation }: any) {
 
         {loadingTournaments ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator color="#2563EB" />
+            <ActivityIndicator color="#149435" />
             <Text style={styles.loadingText}>Buscando torneos disponibles...</Text>
           </View>
         ) : availableTournaments.length === 0 ? (
@@ -484,19 +484,19 @@ export default function CreatePoolScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F1F5F9' },
+  safe: { flex: 1, backgroundColor: '#F4EBD8' },
   header: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: 'white',
     paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#E2E8F0',
+    borderBottomWidth: 1, borderBottomColor: '#DADADA',
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  backIcon: { fontSize: 22, color: '#2563EB' },
+  backIcon: { fontSize: 22, color: '#149435' },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: 'bold', color: '#0F172A' },
   scroll: { padding: 16, paddingBottom: 32 },
   label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8, marginTop: 16 },
   input: {
-    borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10,
+    borderWidth: 1, borderColor: '#DADADA', borderRadius: 10,
     paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#0F172A', backgroundColor: 'white',
   },
   loadingBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'white', borderRadius: 10, padding: 16 },
@@ -520,12 +520,12 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: 'white', borderRadius: 10, padding: 14, marginTop: 16,
-    borderWidth: 1, borderColor: '#E2E8F0',
+    borderWidth: 1, borderColor: '#DADADA',
   },
   sectionTitle: { fontSize: 14, fontWeight: '600', color: '#374151' },
   sectionArrow: { color: '#64748B', fontSize: 12 },
   sectionBody: {
-    backgroundColor: 'white', padding: 14, borderWidth: 1, borderColor: '#E2E8F0',
+    backgroundColor: 'white', padding: 14, borderWidth: 1, borderColor: '#DADADA',
     borderTopWidth: 0, borderBottomLeftRadius: 10, borderBottomRightRadius: 10,
   },
   subLabel: { fontSize: 12, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 10, marginBottom: 8 },
@@ -537,8 +537,8 @@ const styles = StyleSheet.create({
   scoringSubLabel: { fontSize: 11, color: '#94A3B8', marginTop: 1 },
   scoringControls: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   scoringBtn: {
-    width: 30, height: 30, borderRadius: 15, backgroundColor: '#F1F5F9',
-    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0',
+    width: 30, height: 30, borderRadius: 15, backgroundColor: '#F4EBD8',
+    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#DADADA',
   },
   scoringBtnText: { fontSize: 18, color: '#374151', lineHeight: 20 },
   scoringValue: { fontSize: 16, fontWeight: '700', color: '#0F172A', minWidth: 22, textAlign: 'center' },
@@ -546,8 +546,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: '#F0FDF4', borderRadius: 8, padding: 12, marginTop: 4,
   },
-  maxPtsLabel: { fontSize: 13, color: '#16A34A', fontWeight: '500' },
-  maxPtsValue: { fontSize: 16, fontWeight: '800', color: '#16A34A' },
+  maxPtsLabel: { fontSize: 13, color: '#149435', fontWeight: '500' },
+  maxPtsValue: { fontSize: 16, fontWeight: '800', color: '#149435' },
 
   // Toggles
   toggleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 6 },
@@ -555,11 +555,11 @@ const styles = StyleSheet.create({
   toggleInfo: { flex: 1 },
   toggleLabel: { fontSize: 14, fontWeight: '600', color: '#0F172A', marginBottom: 2 },
   toggleDesc: { fontSize: 12, color: '#64748B', lineHeight: 17 },
-  toggleDivider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 12 },
+  toggleDivider: { height: 1, backgroundColor: '#F4EBD8', marginVertical: 12 },
 
   // Premio
   entryFeeInput: {
-    borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10,
+    borderWidth: 1.5, borderColor: '#DADADA', borderRadius: 10,
     paddingHorizontal: 14, paddingVertical: 12, fontSize: 18, fontWeight: '700',
     color: '#0F172A', backgroundColor: 'white', marginBottom: 10,
   },
@@ -567,29 +567,29 @@ const styles = StyleSheet.create({
   currencyContent: { gap: 8, paddingBottom: 4 },
   currencyBtn: {
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1,
-    borderColor: '#E2E8F0', backgroundColor: 'white', marginRight: 6,
+    borderColor: '#DADADA', backgroundColor: 'white', marginRight: 6,
   },
-  currencyBtnActive: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
+  currencyBtnActive: { backgroundColor: '#149435', borderColor: '#149435' },
   currencyText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
   currencyTextActive: { color: 'white' },
   distRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
   distBtn: {
     flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5,
-    borderColor: '#E2E8F0', alignItems: 'center', backgroundColor: 'white',
+    borderColor: '#DADADA', alignItems: 'center', backgroundColor: 'white',
   },
-  distBtnActive: { backgroundColor: '#EFF6FF', borderColor: '#2563EB' },
+  distBtnActive: { backgroundColor: '#ECFDF5', borderColor: '#149435' },
   distText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
-  distTextActive: { color: '#2563EB' },
+  distTextActive: { color: '#149435' },
   pctRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   pctLabel: { fontSize: 13, color: '#374151', fontWeight: '500' },
   pctInputWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   pctInput: {
-    width: 60, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8,
+    width: 60, borderWidth: 1, borderColor: '#DADADA', borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 8, fontSize: 15, fontWeight: '600', color: '#0F172A',
-    textAlign: 'center', backgroundColor: '#F8FAFC',
+    textAlign: 'center', backgroundColor: '#FAF7F2',
   },
   pctSign: { fontSize: 14, color: '#64748B', fontWeight: '600' },
-  pctTotal: { fontSize: 13, fontWeight: '600', color: '#16A34A', textAlign: 'right', marginTop: 4 },
+  pctTotal: { fontSize: 13, fontWeight: '600', color: '#149435', textAlign: 'right', marginTop: 4 },
   pctTotalError: { color: '#DC2626' },
   prizePoolRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -599,8 +599,8 @@ const styles = StyleSheet.create({
   prizePoolValue: { fontSize: 15, fontWeight: '800', color: '#92400E' },
 
   // Footer
-  footer: { padding: 16, backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#E2E8F0' },
-  btnCreate: { backgroundColor: '#16A34A', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  footer: { padding: 16, backgroundColor: 'white', borderTopWidth: 1, borderTopColor: '#DADADA' },
+  btnCreate: { backgroundColor: '#149435', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   btnDisabled: { backgroundColor: '#CBD5E1' },
   btnCreateText: { color: 'white', fontWeight: 'bold', fontSize: 15 },
 });

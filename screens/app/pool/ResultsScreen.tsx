@@ -160,7 +160,7 @@ export default function ResultsScreen({ route }: any) {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#2563EB" /></View>;
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#149435" /></View>;
   if (loadError) return (
     <View style={styles.center}>
       <Text style={styles.errorText}>No se pudieron cargar los resultados.{'\n'}Verifica tu conexión e intenta de nuevo.</Text>
@@ -171,7 +171,7 @@ export default function ResultsScreen({ route }: any) {
     return (
       <ScrollView
         style={styles.container}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563EB']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#149435']} />}
         contentContainerStyle={styles.centerContent}
       >
         <Text style={styles.emptyIcon}>⏳</Text>
@@ -188,7 +188,7 @@ export default function ResultsScreen({ route }: any) {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scroll}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#2563EB']} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#149435']} />}
       showsVerticalScrollIndicator={false}
     >
       {sections.map((section) => {
@@ -290,11 +290,11 @@ export default function ResultsScreen({ route }: any) {
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F1F5F9' },
+  container: { flex: 1, backgroundColor: '#F4EBD8' },
   scroll: { padding: 12, paddingBottom: 32 },
   center: {
     flex: 1, justifyContent: 'center', alignItems: 'center',
-    backgroundColor: '#F1F5F9', padding: 24,
+    backgroundColor: '#F4EBD8', padding: 24,
   },
   centerContent: {
     flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24,
@@ -333,12 +333,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0FDF4', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3,
     borderWidth: 1, borderColor: '#86EFAC',
   },
-  ptsBadgeText: { fontSize: 12, fontWeight: '700', color: '#16A34A' },
+  ptsBadgeText: { fontSize: 12, fontWeight: '700', color: '#149435' },
 
   // ── Tarjeta de resultado (embebida) ─────────────────────────────────────────
   card: {
     backgroundColor: 'white', padding: 14,
-    borderTopWidth: 1, borderTopColor: '#F1F5F9',
+    borderTopWidth: 1, borderTopColor: '#F4EBD8',
   },
   cardLast: {
     borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
   predLabel: { color: '#64748B', fontSize: 13, marginBottom: 6 },
   breakdown: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   breakdownItem: {
-    fontSize: 11, color: '#16A34A', backgroundColor: '#F0FDF4',
+    fontSize: 11, color: '#149435', backgroundColor: '#F0FDF4',
     paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
   },
   breakdownKnockout: { color: '#7C3AED', backgroundColor: '#F5F3FF' },

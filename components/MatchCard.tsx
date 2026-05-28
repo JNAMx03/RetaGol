@@ -88,14 +88,14 @@ const styles = StyleSheet.create({
   input: {
     width: 40,
     height: 40,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F4EBD8',
     textAlign: 'center',
     borderRadius: 8,
     fontSize: 16,
     fontWeight: 'bold',
     color: '#0F172A',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#DADADA',
   },
   separator: {
     fontWeight: 'bold',

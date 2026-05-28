@@ -60,7 +60,7 @@ export default function LanguageScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F1F5F9' },
+  safe: { flex: 1, backgroundColor: '#F4EBD8' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -68,10 +68,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#DADADA',
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  backIcon: { fontSize: 22, color: '#2563EB' },
+  backIcon: { fontSize: 22, color: '#149435' },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     gap: 12,
   },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  rowBorder: { borderBottomWidth: 1, borderBottomColor: '#F4EBD8' },
   flag: { fontSize: 24 },
   langLabel: { flex: 1, fontSize: 15, fontWeight: '500', color: '#0F172A' },
   langDisabled: { color: '#94A3B8' },
@@ -111,13 +111,13 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#149435',
     justifyContent: 'center',
     alignItems: 'center',
   },
   selectedText: { color: 'white', fontSize: 13, fontWeight: 'bold' },
   comingSoon: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F4EBD8',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,

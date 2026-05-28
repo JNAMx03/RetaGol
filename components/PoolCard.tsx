@@ -1,10 +1,11 @@
 import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import { Pool } from '../context/AppContext';
 
+// Liga → verde marca | Copa → dorado | Champions/UCL → azul marino (color UCL)
 const TYPE_COLORS: Record<string, string> = {
-  liga: '#16A34A',
+  liga: '#149435',
   copa: '#EAB308',
-  champions: '#2563EB',
+  champions: '#0369A1',
 };
 
 const TYPE_LABELS: Record<string, string> = {
