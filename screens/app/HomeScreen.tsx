@@ -16,6 +16,7 @@ import { useApp, Pool } from '../../context/AppContext';
 import { supabase } from '../../services/supabase';
 import PoolCard from '../../components/PoolCard';
 import AdBanner from '../../components/AdBanner';
+import { getTeamName } from '../../utils/teamNames';
 
 const MENU_WIDTH = Math.min(Dimensions.get('window').width * 0.82, 340);
 const NOTIF_WIDTH = Math.min(Dimensions.get('window').width * 0.88, 360);
@@ -86,7 +87,7 @@ export default function HomeScreen({ navigation }: any) {
             type: 'result',
             emoji: '⚽',
             title: 'Resultado disponible',
-            body: `${match.home}  ${match.homeScore} – ${match.awayScore}  ${match.away}`,
+            body: `${getTeamName(match.home)}  ${match.homeScore} – ${match.awayScore}  ${getTeamName(match.away)}`,
             poolName: pool.name,
             read: readIds.includes(id),
           });

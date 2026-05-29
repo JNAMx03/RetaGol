@@ -201,7 +201,7 @@ export default function CreatePoolScreen({ navigation }: any) {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>{'←'}</Text>
+          <View style={styles.backArrow} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Crear Polla</Text>
         <View style={{ width: 40 }} />
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#DADADA',
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  backIcon: { fontSize: 22, color: '#149435' },
+  backArrow: { width: 11, height: 11, borderLeftWidth: 2.5, borderBottomWidth: 2.5, borderColor: '#149435', transform: [{ rotate: '45deg' }], marginLeft: 8 },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: 'bold', color: '#0F172A' },
   scroll: { padding: 16, paddingBottom: 32 },
   label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 8, marginTop: 16 },
