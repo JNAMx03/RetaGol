@@ -46,15 +46,14 @@ module.exports = {
           mode: 'development',
         },
       ],
-      // Plugin de AdMob — activar solo cuando se haga el dev/production build nativo
-      // (expo start / Expo Go no lo necesitan y falla si la librería no está linkeada)
-      // [
-      //   'react-native-google-mobile-ads',
-      //   {
-      //     androidAppId: 'ca-app-pub-1275055191844802~8019886009',  // Android real ✅
-      //     iosAppId:     'ca-app-pub-XXXXXXXXXXXXXXXX~APPID',        // iOS — pendiente
-      //   },
-      // ],
+      // Plugin de AdMob — activo para builds nativos (dev + producción)
+      [
+        'react-native-google-mobile-ads',
+        {
+          androidAppId: 'ca-app-pub-1275055191844802~8019886009',  // Android real ✅
+          iosAppId:     'ca-app-pub-XXXXXXXXXXXXXXXX~APPID',        // iOS — pendiente
+        },
+      ],
     ],
     extra: {
       eas: {
