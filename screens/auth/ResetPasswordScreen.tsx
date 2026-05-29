@@ -60,7 +60,7 @@ export default function ResetPasswordScreen() {
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.appName}>RetaGol</Text>
+        <Text style={styles.appName}>Prolla</Text>
         <Text style={styles.appSubtitle}>Predice y compite con tus amigos</Text>
 
         <View style={styles.card}>

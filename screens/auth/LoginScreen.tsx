@@ -64,7 +64,7 @@ export default function LoginScreen({ navigation }: any) {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(
         forgotEmail.trim(),
-        { redirectTo: 'retagol://reset-password' },
+        { redirectTo: 'prolla://reset-password' },
       );
       if (error) throw error;
       setForgotSent(true);
@@ -98,7 +98,7 @@ export default function LoginScreen({ navigation }: any) {
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={styles.appName}>RetaGol</Text>
+          <Text style={styles.appName}>Prolla</Text>
           <Text style={styles.appSubtitle}>Predice y compite con tus amigos</Text>
 
           <View style={styles.card}>
@@ -183,7 +183,7 @@ export default function LoginScreen({ navigation }: any) {
           resizeMode="contain"
         />
 
-        <Text style={styles.appName}>RetaGol</Text>
+        <Text style={styles.appName}>Prolla</Text>
         <Text style={styles.appSubtitle}>Predice y compite con tus amigos</Text>
 
         <View style={styles.card}>

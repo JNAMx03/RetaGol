@@ -171,7 +171,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Procesar deep link de recuperación de contraseña
-    // URL esperada: retagol://reset-password#access_token=...&refresh_token=...&type=recovery
+    // URL esperada: prolla://reset-password#access_token=...&refresh_token=...&type=recovery
     const handleDeepLink = async (url: string | null) => {
       if (!url || !url.includes('reset-password')) return;
       const hash = url.split('#')[1] ?? '';
@@ -366,7 +366,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       throw new Error('GOOGLE_UNAVAILABLE');
     }
 
-    const redirectTo = makeRedirectUri({ scheme: 'retagol', path: 'auth/callback' });
+    const redirectTo = makeRedirectUri({ scheme: 'prolla', path: 'auth/callback' });
 
     // 1. Obtener la URL de OAuth de Supabase
     const { data, error } = await supabase.auth.signInWithOAuth({

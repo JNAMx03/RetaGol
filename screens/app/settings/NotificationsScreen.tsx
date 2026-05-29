@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const NOTIF_KEY = 'retagol_notif_prefs';
+const NOTIF_KEY = 'prolla_notif_prefs';
 
 interface NotifPrefs {
   matchReminders: boolean;

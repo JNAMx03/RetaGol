@@ -21,7 +21,7 @@ export default function SecurityScreen({ navigation }: any) {
     setLoadingReset(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-        redirectTo: 'retagol://reset-password',
+        redirectTo: 'prolla://reset-password',
       });
       if (error) throw error;
       setResetSent(true);

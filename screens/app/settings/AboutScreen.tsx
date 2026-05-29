@@ -12,8 +12,8 @@ import { ScrollView } from 'react-native';
 const APP_VERSION = '1.0.0';
 
 const LINKS = [
-  { icon: '📜', label: 'Términos y condiciones', url: 'https://retagol.app/terms' },
-  { icon: '🔒', label: 'Política de privacidad', url: 'https://retagol.app/privacy' },
+  { icon: '📜', label: 'Términos y condiciones', url: 'https://prolla.app/terms' },
+  { icon: '🔒', label: 'Política de privacidad', url: 'https://prolla.app/privacy' },
 ];
 
 export default function AboutScreen({ navigation }: any) {
@@ -36,7 +36,7 @@ export default function AboutScreen({ navigation }: any) {
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={styles.appName}>RetaGol</Text>
+          <Text style={styles.appName}>Prolla</Text>
           <Text style={styles.appTagline}>Predice y compite con tus amigos</Text>
           <View style={styles.versionBadge}>
             <Text style={styles.versionText}>Versión {APP_VERSION}</Text>
@@ -46,7 +46,7 @@ export default function AboutScreen({ navigation }: any) {
         {/* Descripción */}
         <View style={styles.card}>
           <Text style={styles.descText}>
-            RetaGol es una app de quinielas deportivas donde puedes crear pollas con tus amigos, hacer predicciones de partidos de torneos reales y competir en rankings de puntos.
+            Prolla es una app de quinielas deportivas donde puedes crear pollas con tus amigos, hacer predicciones de partidos de torneos reales y competir en rankings de puntos.
           </Text>
         </View>
 

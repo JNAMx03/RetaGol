@@ -1,4 +1,4 @@
-# RetaGol ⚽
+# Prolla ⚽
 
 Aplicación tipo polla futbolera donde los usuarios pueden crear y unirse a quinielas deportivas.
 

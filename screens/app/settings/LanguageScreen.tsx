@@ -52,7 +52,7 @@ export default function LanguageScreen({ navigation }: any) {
         </View>
 
         <Text style={styles.hint}>
-          Más idiomas estarán disponibles en versiones futuras de RetaGol.
+          Más idiomas estarán disponibles en versiones futuras de Prolla.
         </Text>
       </View>
     </SafeAreaView>

@@ -4,7 +4,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
@@ -12,7 +11,7 @@ import { useState } from 'react';
 const FAQ = [
   {
     q: '¿Cómo funciona la puntuación?',
-    a: 'Cada predicción se compara con el resultado real:\n\n⭐ Marcador exacto → 5 pts\n🔵 Un equipo exacto → 2 pts\n🟡 Ganador/empate correcto → 1 pt\n🟡 Diferencia de goles correcta → 1 pt\n\nEl creador de la polla puede personalizar los puntos al crearla.',
+    a: 'El sistema es aditivo: cada criterio que aciertes suma puntos de forma independiente. Valores por defecto:\n\n✅ Resultado correcto (gana/empata/pierde): +5 pts\n⚽ Goles del local exactos: +2 pts\n⚽ Goles del visitante exactos: +2 pts\n📐 Diferencia de goles exacta: +1 pt\n\nMáximo por partido con valores por defecto: 10 pts.\n\nEl creador de la polla puede personalizar cada valor y activar opciones especiales: doble puntos en fases eliminatorias o +1 bonus para el único que acierte el marcador exacto.',
   },
   {
     q: '¿Cómo creo una polla?',
@@ -73,24 +72,6 @@ export default function HelpScreen({ navigation }: any) {
           ))}
         </View>
 
-        {/* Contacto */}
-        <Text style={styles.sectionTitle}>Contacto</Text>
-        <View style={styles.card}>
-          <TouchableOpacity
-            style={styles.contactRow}
-            onPress={() => Linking.openURL('mailto:soporte@retagol.app')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.contactIconBox}>
-              <Text style={styles.contactIcon}>✉️</Text>
-            </View>
-            <View style={styles.contactInfo}>
-              <Text style={styles.contactTitle}>Escribir al soporte</Text>
-              <Text style={styles.contactDesc}>soporte@retagol.app</Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -149,24 +130,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 14,
   },
-  contactRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 12,
-  },
-  contactIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#ECFDF5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  contactIcon: { fontSize: 18 },
-  contactInfo: { flex: 1 },
-  contactTitle: { fontSize: 14, fontWeight: '600', color: '#0F172A', marginBottom: 2 },
-  contactDesc: { fontSize: 12, color: '#64748B' },
-  chevron: { fontSize: 22, color: '#CBD5E1' },
 });

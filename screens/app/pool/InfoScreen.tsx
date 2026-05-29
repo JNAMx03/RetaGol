@@ -1,11 +1,12 @@
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator,
 } from 'react-native';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CommonActions } from '@react-navigation/native';
 import { useApp, Pool } from '../../../context/AppContext';
 import { supabase } from '../../../services/supabase';
 import { getMaxMatchPoints } from '../../../utils/scoring';
+import { getTeamName } from '../../../utils/teamNames';
 
 // ─── Helper: fecha de expiración (último partido + 7 días) ────────────────────
 
@@ -30,6 +31,25 @@ export default function InfoScreen({ route, navigation }: any) {
   const [scoringOpen, setScoringOpen] = useState(false);
   const [prizeOpen, setPrizeOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Picks del torneo del usuario actual
+  const [picks, setPicks] = useState<{ champion: string | null; runner_up: string | null; third_place: string | null } | null>(null);
+  const [loadingPicks, setLoadingPicks] = useState(false);
+
+  useEffect(() => {
+    if (!ch?.enabled || !user?.id) return;
+    setLoadingPicks(true);
+    supabase
+      .from('pool_champion_predictions')
+      .select('champion, runner_up, third_place')
+      .eq('pool_id', pool.id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setPicks(data ?? null);
+        setLoadingPicks(false);
+      });
+  }, []);
 
   const sc = pool.scoringConfig;
   const ch = pool.championConfig;
@@ -107,6 +127,38 @@ export default function InfoScreen({ route, navigation }: any) {
         <InfoRow label="Participantes" value={String(pool.participants)} />
         <InfoRow label="Total de Partidos" value={String(pool.matches?.length ?? 0)} last />
       </View>
+
+      {/* ── Mi Predicción Final (solo si está habilitada) ───────────────── */}
+      {ch?.enabled && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🏆 Mi Predicción Final</Text>
+          {loadingPicks ? (
+            <ActivityIndicator size="small" color="#149435" style={{ marginTop: 12 }} />
+          ) : picks ? (
+            <View style={styles.accordionBody}>
+              {([
+                { icon: '🥇', label: 'Campeón',      value: picks.champion },
+                { icon: '🥈', label: 'Subcampeón',   value: picks.runner_up },
+                { icon: '🥉', label: 'Tercer lugar', value: picks.third_place },
+              ] as const).map((row) => (
+                <View key={row.label} style={styles.pickRow}>
+                  <Text style={styles.pickIcon}>{row.icon}</Text>
+                  <Text style={styles.pickLabel}>{row.label}</Text>
+                  <Text style={styles.pickValue}>
+                    {row.value ? getTeamName(row.value) : '—'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.noPicksRow}>
+              <Text style={styles.noPicksText}>
+                📝 Aún no has elegido tus picks del torneo
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* ── Sistema de puntuación ────────────────────────────────────────── */}
       <View style={styles.section}>
@@ -353,6 +405,20 @@ const styles = StyleSheet.create({
   },
   prizePoolLabel: { fontSize: 14, color: '#92400E', fontWeight: '600' },
   prizePoolValue: { fontSize: 18, fontWeight: '800', color: '#92400E' },
+
+  // Picks del torneo
+  pickRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#F4EBD8',
+  },
+  pickIcon: { fontSize: 20, width: 30 },
+  pickLabel: { flex: 1, fontSize: 14, color: '#64748B' },
+  pickValue: { fontWeight: '700', color: '#0F172A', fontSize: 14 },
+  noPicksRow: {
+    marginTop: 12, paddingVertical: 16, alignItems: 'center',
+    backgroundColor: '#FAF7F2', borderRadius: 10,
+  },
+  noPicksText: { fontSize: 13, color: '#94A3B8' },
 
   // Zona peligrosa
   dangerZone: {

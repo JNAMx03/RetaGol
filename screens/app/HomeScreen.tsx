@@ -15,11 +15,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp, Pool } from '../../context/AppContext';
 import { supabase } from '../../services/supabase';
 import PoolCard from '../../components/PoolCard';
+import AdBanner from '../../components/AdBanner';
 
 const MENU_WIDTH = Math.min(Dimensions.get('window').width * 0.82, 340);
 const NOTIF_WIDTH = Math.min(Dimensions.get('window').width * 0.88, 360);
-const READ_KEY = 'retagol_read_notifs';
-const DISMISSED_KEY = 'retagol_dismissed_notifs';
+const READ_KEY = 'prolla_read_notifs';
+const DISMISSED_KEY = 'prolla_dismissed_notifs';
 
 interface NotifItem {
   id: string;
@@ -268,6 +269,9 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         }
       />
+
+      {/* ── Banner publicitario (aparece / desaparece con intervalo) ─── */}
+      <AdBanner />
 
       {/* ── Botones inferiores ───────────────────────── */}
       <View style={styles.footer}>

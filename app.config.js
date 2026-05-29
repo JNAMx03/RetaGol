@@ -4,10 +4,10 @@
 
 module.exports = {
   expo: {
-    name: 'RetaGol',
-    slug: 'RetaGol',
+    name: 'Prolla',
+    slug: 'Prolla',
     version: '1.0.0',
-    scheme: 'retagol',
+    scheme: 'prolla',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
@@ -21,7 +21,7 @@ module.exports = {
       supportsTablet: true,
     },
     android: {
-      package: 'com.retagol.app',
+      package: 'com.prolla.app',
       // En EAS Build, GOOGLE_SERVICES_JSON es la ruta al secreto de archivo.
       // En local, usa el archivo directamente si existe.
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
@@ -46,6 +46,15 @@ module.exports = {
           mode: 'development',
         },
       ],
+      // Plugin de AdMob — activar solo cuando se haga el dev/production build nativo
+      // (expo start / Expo Go no lo necesitan y falla si la librería no está linkeada)
+      // [
+      //   'react-native-google-mobile-ads',
+      //   {
+      //     androidAppId: 'ca-app-pub-1275055191844802~8019886009',  // Android real ✅
+      //     iosAppId:     'ca-app-pub-XXXXXXXXXXXXXXXX~APPID',        // iOS — pendiente
+      //   },
+      // ],
     ],
     extra: {
       eas: {
