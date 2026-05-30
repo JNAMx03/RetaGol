@@ -249,10 +249,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     Linking.getInitialURL().then(handleDeepLink);
 
     // Caso 2: app ya abierta en segundo plano
-    const linkSubscription = Linking.addEventListener('url', ({ url }) => {
-      Alert.alert('📡 Linking event', url); // DEBUG TEMPORAL
-      handleDeepLink(url);
-    });
+    const linkSubscription = Linking.addEventListener('url', ({ url }) => handleDeepLink(url));
 
     return () => {
       authSubscription.unsubscribe();
