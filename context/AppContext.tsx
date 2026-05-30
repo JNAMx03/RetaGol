@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 import {
@@ -431,52 +431,50 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
 
     // 2. Abrir el navegador con la URL de Google
-    const result = await WebBrowser.openAuthSessionAsync(data.url!, redirectTo);
-    if (result.type !== 'success') return;
+    if (Platform.OS === 'ios') {
+      // iOS: openAuthSessionAsync captura la URL de retorno directamente
+      const result = await WebBrowser.openAuthSessionAsync(data.url!, redirectTo);
+      if (result.type !== 'success' || !result.url) return;
 
-    // 3. Extraer sesión de la URL de retorno
-    // Supabase usa PKCE por defecto: llega ?code=xxx → hay que canjear por sesión
-    // Fallback: formato clásico con #access_token=xxx en el hash
-    let sessionData: any = null;
-    let sessionError: any = null;
+      // Extraer sesión de la URL — PKCE (?code=xxx) o implicit (#access_token=xxx)
+      const queryString = result.url.split('?')[1] ?? '';
+      const queryParams = new URLSearchParams(queryString);
+      const code = queryParams.get('code');
 
-    const queryString = result.url.split('?')[1] ?? '';
-    const queryParams = new URLSearchParams(queryString);
-    const code = queryParams.get('code');
+      let sessionData: any = null;
+      let sessionError: any = null;
 
-    if (code) {
-      // PKCE flow (moderno)
-      const res = await supabase.auth.exchangeCodeForSession(code);
-      sessionData = res.data;
-      sessionError = res.error;
+      if (code) {
+        const res = await supabase.auth.exchangeCodeForSession(code);
+        sessionData = res.data; sessionError = res.error;
+      } else {
+        const hash = result.url.split('#')[1] ?? '';
+        const hashParams = new URLSearchParams(hash);
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        if (!accessToken || !refreshToken) return;
+        const res = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        sessionData = res.data; sessionError = res.error;
+      }
+
+      if (sessionError) throw sessionError;
+
+      const userId = sessionData?.user?.id;
+      if (!userId) return;
+
+      const { data: profile } = await supabase
+        .from('profiles').select('*').eq('id', userId).single();
+
+      if (profile) {
+        setUser(profile);
+        setIsLogged(true);
+        await loadPoolsForUser(userId);
+      }
     } else {
-      // Implicit flow (clásico)
-      const hash = result.url.split('#')[1] ?? '';
-      const hashParams = new URLSearchParams(hash);
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
-      if (!accessToken || !refreshToken) return;
-      const res = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-      sessionData = res.data;
-      sessionError = res.error;
-    }
-
-    if (sessionError) throw sessionError;
-
-    // 5. Cargar perfil y pollas
-    const userId = sessionData.user?.id;
-    if (!userId) return;
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (profile) {
-      setUser(profile);
-      setIsLogged(true);
-      await loadPoolsForUser(userId);
+      // Android: openAuthSessionAsync devuelve 'cancel' cuando el custom scheme abre la app.
+      // Usamos Linking.openURL — el callback prolla://auth/callback?code=xxx llega
+      // via Linking.addEventListener y handleDeepLink lo procesa automáticamente.
+      await Linking.openURL(data.url!);
     }
   };
 
