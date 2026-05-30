@@ -186,7 +186,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const isRecovery = url.includes('reset-password');
       const isCallback = url.includes('auth/callback');
-      if (!isRecovery && !isCallback) return;
+      // También aceptar prolla:// con tokens en el hash (Google OAuth implicit flow)
+      const hasTokensInHash = url.includes('access_token=');
+      if (!isRecovery && !isCallback && !hasTokensInHash) return;
 
       // ── PKCE flow: ?code=xxx ───────────────────────────────────────────────
       const queryString = url.split('?')[1] ?? '';
@@ -227,10 +229,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       if (error) return;
 
-      if (type === 'recovery') {
+      // type === 'recovery': reset de contraseña
+      // type === 'signup': confirmación de correo
+      // type === null/vacío: Google OAuth (implicit flow) → loguear directamente
+      if (type === 'recovery' || isRecovery) {
         setRecoveryMode(true);
       } else if (data.user) {
-        // Confirmación de correo — loguear al usuario
         const { data: profile } = await supabase
           .from('profiles').select('*').eq('id', data.user.id).single();
         if (profile) {
@@ -245,7 +249,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     Linking.getInitialURL().then(handleDeepLink);
 
     // Caso 2: app ya abierta en segundo plano
-    const linkSubscription = Linking.addEventListener('url', ({ url }) => handleDeepLink(url));
+    const linkSubscription = Linking.addEventListener('url', ({ url }) => {
+      Alert.alert('📡 Linking event', url); // DEBUG TEMPORAL
+      handleDeepLink(url);
+    });
 
     return () => {
       authSubscription.unsubscribe();
