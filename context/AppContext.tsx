@@ -162,7 +162,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
     loadData();
 
-    // Escuchar evento PASSWORD_RECOVERY de Supabase Auth
+    // Escuchar eventos de Supabase Auth
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         setRecoveryMode(true);
@@ -170,20 +170,75 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Procesar deep link de recuperación de contraseña
-    // URL esperada: prolla://reset-password#access_token=...&refresh_token=...&type=recovery
+    // Procesar deep links de Supabase. Tres casos posibles:
+    //
+    //   1. Recuperación de contraseña (reset-password):
+    //      PKCE:     prolla://reset-password?code=xxx
+    //      Implicit: prolla://reset-password#access_token=xxx&type=recovery
+    //
+    //   2. Confirmación de correo / signup (auth/callback):
+    //      PKCE:     prolla://auth/callback?code=xxx
+    //      Implicit: prolla://auth/callback#access_token=xxx&type=signup
+    //
+    //   3. OAuth de Google — manejado directamente en loginWithGoogle() via WebBrowser
     const handleDeepLink = async (url: string | null) => {
-      if (!url || !url.includes('reset-password')) return;
+      if (!url) return;
+
+      const isRecovery = url.includes('reset-password');
+      const isCallback = url.includes('auth/callback');
+      if (!isRecovery && !isCallback) return;
+
+      // ── PKCE flow: ?code=xxx ───────────────────────────────────────────────
+      const queryString = url.split('?')[1] ?? '';
+      const queryParams = new URLSearchParams(queryString);
+      const code = queryParams.get('code');
+
+      if (code) {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) return;
+
+        if (isRecovery) {
+          // Modo recuperación — mostrar ResetPasswordScreen
+          setRecoveryMode(true);
+        } else if (data.user) {
+          // Confirmación de correo — loguear al usuario directamente
+          const { data: profile } = await supabase
+            .from('profiles').select('*').eq('id', data.user.id).single();
+          if (profile) {
+            setUser(profile);
+            setIsLogged(true);
+            await loadPoolsForUser(data.user.id);
+          }
+        }
+        return;
+      }
+
+      // ── Implicit flow: #access_token=xxx ──────────────────────────────────
       const hash = url.split('#')[1] ?? '';
-      const params = new URLSearchParams(hash);
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
+      const hashParams = new URLSearchParams(hash);
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      const type = hashParams.get('type'); // 'recovery' | 'signup'
       if (!accessToken) return;
-      // Establecer sesión → dispara PASSWORD_RECOVERY en onAuthStateChange
-      await supabase.auth.setSession({
+
+      const { data, error } = await supabase.auth.setSession({
         access_token: accessToken,
         refresh_token: refreshToken ?? '',
       });
+      if (error) return;
+
+      if (type === 'recovery') {
+        setRecoveryMode(true);
+      } else if (data.user) {
+        // Confirmación de correo — loguear al usuario
+        const { data: profile } = await supabase
+          .from('profiles').select('*').eq('id', data.user.id).single();
+        if (profile) {
+          setUser(profile);
+          setIsLogged(true);
+          await loadPoolsForUser(data.user.id);
+        }
+      }
     };
 
     // Caso 1: app cerrada, abierta desde el link del correo
@@ -379,18 +434,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const result = await WebBrowser.openAuthSessionAsync(data.url!, redirectTo);
     if (result.type !== 'success') return;
 
-    // 3. Extraer tokens del hash de la URL de retorno
-    const hash = result.url.split('#')[1] ?? '';
-    const params = new URLSearchParams(hash);
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
-    if (!accessToken || !refreshToken) return;
+    // 3. Extraer sesión de la URL de retorno
+    // Supabase usa PKCE por defecto: llega ?code=xxx → hay que canjear por sesión
+    // Fallback: formato clásico con #access_token=xxx en el hash
+    let sessionData: any = null;
+    let sessionError: any = null;
 
-    // 4. Establecer sesión en Supabase
-    const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
+    const queryString = result.url.split('?')[1] ?? '';
+    const queryParams = new URLSearchParams(queryString);
+    const code = queryParams.get('code');
+
+    if (code) {
+      // PKCE flow (moderno)
+      const res = await supabase.auth.exchangeCodeForSession(code);
+      sessionData = res.data;
+      sessionError = res.error;
+    } else {
+      // Implicit flow (clásico)
+      const hash = result.url.split('#')[1] ?? '';
+      const hashParams = new URLSearchParams(hash);
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
+      if (!accessToken || !refreshToken) return;
+      const res = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+      sessionData = res.data;
+      sessionError = res.error;
+    }
+
     if (sessionError) throw sessionError;
 
     // 5. Cargar perfil y pollas

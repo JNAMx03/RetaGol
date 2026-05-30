@@ -1,15 +1,22 @@
 import { useEffect } from 'react';
 import { OneSignal } from 'react-native-onesignal';
+import mobileAds from 'react-native-google-mobile-ads';
 import AppNavigator from './navigation/AppNavigator';
 import { AppProvider } from './context/AppContext';
 import { supabase } from './services/supabase';
 
-const ONESIGNAL_APP_ID = process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID!;
+const ONESIGNAL_APP_ID = process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID ?? '';
 
 export default function App() {
   useEffect(() => {
-    OneSignal.initialize(ONESIGNAL_APP_ID);
-    OneSignal.Notifications.requestPermission(true);
+    // Inicializar Google Mobile Ads antes de cualquier uso de banners
+    mobileAds().initialize();
+
+    // OneSignal solo si hay un App ID configurado
+    if (ONESIGNAL_APP_ID) {
+      OneSignal.initialize(ONESIGNAL_APP_ID);
+      OneSignal.Notifications.requestPermission(true);
+    }
 
     const savePlayerId = async () => {
       const id = (OneSignal.User.pushSubscription as any).id as string | undefined;

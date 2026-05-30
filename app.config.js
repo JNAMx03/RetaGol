@@ -6,6 +6,7 @@ module.exports = {
   expo: {
     name: 'Prolla',
     slug: 'Prolla',
+    owner: 'jnamx03',
     version: '1.0.0',
     scheme: 'prolla',
     orientation: 'portrait',
@@ -40,10 +41,11 @@ module.exports = {
     },
     plugins: [
       'expo-secure-store',
+      'expo-web-browser',
       [
         'onesignal-expo-plugin',
         {
-          mode: 'development',
+          mode: 'production',
         },
       ],
       // Plugin de AdMob — activo para builds nativos (dev + producción)
@@ -57,7 +59,7 @@ module.exports = {
     ],
     extra: {
       eas: {
-        projectId: '140ef772-27c5-45c1-9fb2-f5a9f4cb5db9',
+        projectId: '44d710b0-de2c-44e8-b641-76ee51359b66',
       },
     },
   },
