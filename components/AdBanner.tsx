@@ -59,7 +59,7 @@ export default function AdBanner() {
           size={BannerAdSize.BANNER}
           requestOptions={{ requestNonPersonalizedAdsOnly: true }}
           onAdLoaded={() => setAdLoaded(true)}
-          onAdFailedToLoad={() => setAdLoaded(false)}
+          onAdFailedToLoad={() => setAdLoaded(false)}  // silencia crash en emuladores
         />
       </Animated.View>
     </Animated.View>

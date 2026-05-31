@@ -1,5 +1,5 @@
 const BASE_URL = 'https://api.football-data.org/v4';
-const API_KEY = process.env.EXPO_PUBLIC_FOOTBALL_DATA_KEY!;
+const API_KEY = process.env.EXPO_PUBLIC_FOOTBALL_DATA_KEY ?? '';;
 
 export const TOURNAMENTS = [
   { code: 'WC',  name: 'Mundial 2026',      color: '#15803D' },
@@ -42,42 +42,56 @@ async function fetchJSON(url: string) {
 
 /**
  * Consulta la API por cada torneo y devuelve solo los que:
- * - Aún no han comenzado (startDate > hoy)
- * - Tienen partidos confirmados (SCHEDULED)
+ * - Aún no han comenzado (primer partido SCHEDULED es futuro)
+ * - Tienen partidos confirmados con equipos definidos
+ *
+ * Estrategia: va directo a los partidos programados sin depender de
+ * currentSeason (que puede fallar con 400/403 cuando el torneo está
+ * entre temporadas o en plan gratuito con acceso limitado).
  */
 export async function getAvailableTournaments(): Promise<AvailableTournament[]> {
+  if (!API_KEY) throw new Error('API key de fútbol no configurada. Verifica EXPO_PUBLIC_FOOTBALL_DATA_KEY.');
+
   const today = new Date();
 
   const results = await Promise.allSettled(
     TOURNAMENTS.map(async (t): Promise<AvailableTournament | null> => {
-      // 1. Info de la competición para saber si ya inició
-      const info = await fetchJSON(`${BASE_URL}/competitions/${t.code}`);
-      const season = info.currentSeason;
-      if (!season) return null;
-
-      const startDate = new Date(season.startDate);
-      if (startDate <= today) return null; // ya inició → no mostrar en V1
-
-      // 2. Partidos programados (confirma que los fixtures existen)
+      // 1. Partidos programados — endpoint siempre disponible en plan gratuito
       const matchData = await fetchJSON(
         `${BASE_URL}/competitions/${t.code}/matches?status=SCHEDULED`,
       );
-      // Filtrar partidos donde los equipos aún no están definidos (fases eliminatorias TBD)
       const allMatches: ApiMatch[] = matchData.matches ?? [];
       const matches = allMatches.filter(
         (m) => m.homeTeam?.name != null && m.awayTeam?.name != null,
       );
-      if (matches.length === 0) return null; // sin fixtures con equipos definidos → no mostrar
+      if (matches.length === 0) return null;
+
+      // 2. Verificar que el primer partido aún no ha ocurrido (torneo no iniciado)
+      const firstMatchDate = new Date(matches[0].utcDate);
+      if (firstMatchDate <= today) return null; // ya comenzó → no mostrar en V1
 
       // Guardar en caché para reutilizar al crear la polla
       matchCache[t.code as TournamentCode] = matches;
+
+      // 3. Intentar obtener startDate/endDate reales de la competición
+      //    Si falla (400/403), usar fechas del primer y último partido
+      let startDate = matches[0].utcDate;
+      let endDate   = matches[matches.length - 1].utcDate;
+      try {
+        const info = await fetchJSON(`${BASE_URL}/competitions/${t.code}`);
+        const season = info.currentSeason;
+        if (season?.startDate) startDate = season.startDate;
+        if (season?.endDate)   endDate   = season.endDate;
+      } catch {
+        // silenciar — usamos fechas de los partidos como fallback
+      }
 
       return {
         code: t.code as TournamentCode,
         name: t.name as string,
         color: t.color as string,
-        startDate: season.startDate,
-        endDate: season.endDate,
+        startDate,
+        endDate,
         totalMatches: matches.length,
       };
     }),

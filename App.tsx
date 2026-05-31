@@ -9,8 +9,8 @@ const ONESIGNAL_APP_ID = process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID ?? '';
 
 export default function App() {
   useEffect(() => {
-    // Inicializar Google Mobile Ads antes de cualquier uso de banners
-    mobileAds().initialize();
+    // Inicializar Google Mobile Ads — en emuladores o builds sin Play Services puede fallar
+    try { mobileAds().initialize(); } catch (e) { console.log('AdMob init skipped:', e); }
 
     // OneSignal solo si hay un App ID configurado
     if (ONESIGNAL_APP_ID) {
