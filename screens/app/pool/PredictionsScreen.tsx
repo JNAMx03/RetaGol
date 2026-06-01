@@ -15,8 +15,17 @@ import { getTeamName } from '../../../utils/teamNames';
 // ─── Helpers de fecha ─────────────────────────────────────────────────────────
 
 function getDateKey(match: Match): string {
-  if (match.utcDate) return match.utcDate.split('T')[0]; // "2026-06-11"
-  return match.date;                                       // fallback al string formateado
+  if (match.utcDate) {
+    // Convertir a fecha LOCAL del dispositivo para agrupar correctamente.
+    // Un partido a las 9PM Colombia (UTC-5) es UTC+1 día → sin esta conversión
+    // quedaría en la sección del día siguiente.
+    const d = new Date(match.utcDate);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  return match.date;
 }
 
 function formatSectionTitle(key: string): string {

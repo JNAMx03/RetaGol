@@ -26,7 +26,13 @@ export default function JoinPoolScreen({ navigation }: any) {
     setLoading(true);
     try {
       const pool = await joinPool(code.trim());
-      navigation.replace('PoolDetail', { pool });
+      // Si la polla tiene predicción de campeón y el usuario acaba de unirse
+      // (nunca ha elegido), llevarlo primero a ChampionPrediction
+      if (pool.championConfig?.enabled) {
+        navigation.replace('ChampionPrediction', { pool });
+      } else {
+        navigation.replace('PoolDetail', { pool });
+      }
     } catch (e: any) {
       if (e.message === 'YA_PARTICIPANTE') {
         Alert.alert('Ya estás en esta polla', 'Puedes verla en tu pantalla principal.');

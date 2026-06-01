@@ -475,10 +475,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         await loadPoolsForUser(userId);
       }
     } else {
-      // Android: openAuthSessionAsync devuelve 'cancel' cuando el custom scheme abre la app.
-      // Usamos Linking.openURL — el callback prolla://auth/callback?code=xxx llega
-      // via Linking.addEventListener y handleDeepLink lo procesa automáticamente.
-      await Linking.openURL(data.url!);
+      // Android: Chrome Custom Tab (overlay dentro de la app — mejor UX que browser externo).
+      // Devuelve 'cancel' cuando prolla:// abre la app, pero el callback llega
+      // via Linking.addEventListener → handleDeepLink lo procesa automáticamente.
+      await WebBrowser.openAuthSessionAsync(data.url!, redirectTo);
     }
   };
 

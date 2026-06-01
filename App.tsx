@@ -18,6 +18,11 @@ export default function App() {
       OneSignal.Notifications.requestPermission(true);
     }
 
+    // Guarda el subscription ID de OneSignal en el perfil del usuario autenticado.
+    // Se llama en tres momentos para cubrir todos los casos:
+    //   1. Al iniciar la app (si ya hay sesión activa)
+    //   2. Cuando OneSignal asigna/renueva el ID (evento 'change')
+    //   3. Cuando el usuario inicia sesión (evento SIGNED_IN de Supabase)
     const savePlayerId = async () => {
       const id = (OneSignal.User.pushSubscription as any).id as string | undefined;
       if (!id) return;
@@ -30,13 +35,20 @@ export default function App() {
       }
     };
 
-    // Guardar si ya hay sesión activa al iniciar
+    // Caso 1: sesión activa al arrancar
     savePlayerId();
 
-    // Volver a guardar cuando cambie la suscripción (primer login, renovación)
+    // Caso 2: OneSignal renueva o asigna el ID por primera vez
     OneSignal.User.pushSubscription.addEventListener('change', savePlayerId);
+
+    // Caso 3: usuario acaba de iniciar sesión (el ID ya estaba listo pero no había usuario)
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') savePlayerId();
+    });
+
     return () => {
       OneSignal.User.pushSubscription.removeEventListener('change', savePlayerId);
+      authSub.unsubscribe();
     };
   }, []);
 

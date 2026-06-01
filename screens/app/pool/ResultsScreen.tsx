@@ -18,7 +18,14 @@ const SYNC_FUNCTION_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/
 // ─── Helpers de fecha ─────────────────────────────────────────────────────────
 
 function getDateKey(match: Match): string {
-  if (match.utcDate) return match.utcDate.split('T')[0];
+  if (match.utcDate) {
+    // Fecha LOCAL del dispositivo para agrupar correctamente (evita desfase UTC)
+    const d = new Date(match.utcDate);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
   return match.date;
 }
 
