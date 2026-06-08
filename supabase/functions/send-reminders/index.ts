@@ -9,15 +9,17 @@ serve(async () => {
   );
 
   const now = new Date();
-  const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+  // Ventana: entre 15 y 30 minutos desde ahora — evita duplicados si el cron corre cada 15 min
+  const in15 = new Date(now.getTime() + 15 * 60 * 1000);
+  const in30 = new Date(now.getTime() + 30 * 60 * 1000);
 
-  // Partidos sin resultado cuyo utc_date cae dentro de la próxima hora
+  // Partidos sin resultado cuyo utc_date cae en la ventana de 15-30 minutos
   const { data: matches } = await supabase
     .from('matches')
     .select('id, pool_id, home, away')
     .is('home_score', null)
-    .gte('utc_date', now.toISOString())
-    .lte('utc_date', oneHourLater.toISOString());
+    .gte('utc_date', in15.toISOString())
+    .lte('utc_date', in30.toISOString());
 
   if (!matches || matches.length === 0) {
     return new Response(JSON.stringify({ reminders: 0 }), {
@@ -42,8 +44,8 @@ serve(async () => {
 
       await sendPushNotification(
         playerIds,
-        'Partido en 1 hora',
-        `${match.home} vs ${match.away} empieza pronto — ¿ya hiciste tu predicción?`,
+        '⏱️ Partido en 15 minutos',
+        `${match.home} vs ${match.away} — ¡última oportunidad para hacer tu predicción!`,
         { type: 'reminder', pool_id: match.pool_id },
       );
       reminders++;

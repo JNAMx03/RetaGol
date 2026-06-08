@@ -15,6 +15,23 @@ import { getTeamName } from '../../../utils/teamNames';
 
 const SYNC_FUNCTION_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-results`;
 
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+interface ParticipantPred {
+  userId: string;
+  name: string;
+  homeScore: string;
+  awayScore: string;
+}
+
+interface DaySection {
+  key: string;
+  title: string;
+  totalCount: number;
+  totalPts: number;
+  data: Match[];
+}
+
 // ─── Helpers de fecha ─────────────────────────────────────────────────────────
 
 function getDateKey(match: Match): string {
@@ -38,32 +55,33 @@ function formatSectionTitle(key: string): string {
   } catch { return key; }
 }
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-
-interface DaySection {
-  key: string;
-  title: string;
-  totalCount: number;
-  totalPts: number;
-  data: Match[];
-}
-
 // ─── Pantalla ─────────────────────────────────────────────────────────────────
 
 export default function ResultsScreen({ route }: any) {
   const { pool } = route.params;
   const { user } = useApp();
 
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [predictions, setPredictions] = useState<Record<string, { homeScore: string; awayScore: string }>>({});
+  const [finishedMatches, setFinishedMatches] = useState<Match[]>([]);
+  const [inProgressMatches, setInProgressMatches] = useState<Match[]>([]);
+  const [myPredictions, setMyPredictions] = useState<Record<string, { homeScore: string; awayScore: string }>>({});
+
+  // Predicciones de todos los participantes — cargadas lazy al expandir
+  const [participantPreds, setParticipantPreds] = useState<Record<string, ParticipantPred[]>>({});
+  const [loadingPreds, setLoadingPreds] = useState<Set<string>>(new Set());
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
+
+  // Dos niveles de acordeón: secciones de fecha (finalizados) y partidos expandidos
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
+  const [expandedMatches, setExpandedMatches] = useState<Set<string>>(new Set());
+
+  // ── Carga de datos ─────────────────────────────────────────────────────────
 
   const fetchData = async () => {
     try {
-      // Predicciones del usuario
+      // Mis predicciones
       const { data: preds } = await supabase
         .from('predictions')
         .select('match_id, home_score, away_score')
@@ -75,40 +93,50 @@ export default function ResultsScreen({ route }: any) {
         preds.forEach((p) => {
           map[p.match_id] = { homeScore: p.home_score ?? '', awayScore: p.away_score ?? '' };
         });
-        setPredictions(map);
+        setMyPredictions(map);
       }
 
-      // Marcadores frescos: solo los finalizados, con utc_date para ordenar
-      const { data: freshMatches, error: matchError } = await supabase
+      const now = new Date().toISOString();
+
+      // Partidos finalizados (tienen resultado)
+      const { data: finished, error } = await supabase
         .from('matches')
         .select('id, home, away, date, utc_date, home_score, away_score, stage')
         .eq('pool_id', pool.id)
         .not('home_score', 'is', null)
         .not('away_score', 'is', null);
 
-      if (matchError) { setLoadError(true); return; }
+      if (error) { setLoadError(true); return; }
 
-      if (freshMatches && freshMatches.length > 0) {
-        // Ordenar por fecha descendente (más recientes primero)
-        const sorted = [...freshMatches].sort((a, b) => {
-          if (!a.utc_date) return 1;
-          if (!b.utc_date) return -1;
-          return b.utc_date.localeCompare(a.utc_date);
-        });
+      // Partidos en curso: ya empezaron (utc_date < ahora) pero sin resultado aún
+      const { data: inProgress } = await supabase
+        .from('matches')
+        .select('id, home, away, date, utc_date, home_score, away_score, stage')
+        .eq('pool_id', pool.id)
+        .is('home_score', null)
+        .lt('utc_date', now);
 
-        setMatches(sorted.map((m) => ({
-          id: m.id,
-          home: m.home,
-          away: m.away,
-          date: m.date,
-          utcDate: m.utc_date ?? undefined,
-          homeScore: m.home_score ?? '',
-          awayScore: m.away_score ?? '',
-          stage: m.stage ?? 'GROUP_STAGE',
-        })));
-      } else {
-        setMatches([]);
-      }
+      const mapMatch = (m: any): Match => ({
+        id: m.id,
+        home: m.home,
+        away: m.away,
+        date: m.date,
+        utcDate: m.utc_date ?? undefined,
+        homeScore: m.home_score ?? '',
+        awayScore: m.away_score ?? '',
+        stage: m.stage ?? 'GROUP_STAGE',
+      });
+
+      // Finalizados: ordenar descendente (más recientes primero)
+      const sortedFinished = [...(finished ?? [])].sort((a, b) => {
+        if (!a.utc_date) return 1;
+        if (!b.utc_date) return -1;
+        return b.utc_date.localeCompare(a.utc_date);
+      });
+
+      setFinishedMatches(sortedFinished.map(mapMatch));
+      setInProgressMatches((inProgress ?? []).map(mapMatch));
+
     } catch {
       setLoadError(true);
     }
@@ -128,33 +156,52 @@ export default function ResultsScreen({ route }: any) {
     setRefreshing(false);
   };
 
-  const maxPts = getMaxMatchPoints(pool.scoringConfig);
+  // ── Cargar predicciones de todos para un partido (lazy) ────────────────────
 
-  // Agrupar por fecha (más recientes primero)
-  const sections = useMemo<DaySection[]>(() => {
-    const map = new Map<string, Match[]>();
-    for (const match of matches) {
-      const key = getDateKey(match);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(match);
+  const loadParticipantPreds = async (matchId: string) => {
+    if (participantPreds[matchId] || loadingPreds.has(matchId)) return;
+
+    setLoadingPreds((prev) => new Set(prev).add(matchId));
+    try {
+      const { data } = await supabase
+        .from('predictions')
+        .select('user_id, home_score, away_score, profiles(name)')
+        .eq('pool_id', pool.id)
+        .eq('match_id', matchId);
+
+      if (data) {
+        const parsed: ParticipantPred[] = data.map((p: any) => ({
+          userId: p.user_id,
+          name: p.profiles?.name ?? 'Usuario',
+          homeScore: p.home_score ?? '',
+          awayScore: p.away_score ?? '',
+        }));
+        // Poner al usuario actual primero
+        parsed.sort((a, b) => {
+          if (a.userId === user?.id) return -1;
+          if (b.userId === user?.id) return 1;
+          return a.name.localeCompare(b.name);
+        });
+        setParticipantPreds((prev) => ({ ...prev, [matchId]: parsed }));
+      }
+    } catch (_) {}
+    finally {
+      setLoadingPreds((prev) => { const s = new Set(prev); s.delete(matchId); return s; });
     }
-    return Array.from(map.entries())
-      .sort(([a], [b]) => b.localeCompare(a)) // descendente: más recientes primero
-      .map(([key, data]) => {
-        const totalPts = data.reduce((sum, m) => {
-          const pred = predictions[m.id];
-          return sum + getMatchPoints(
-            pred,
-            { homeScore: m.homeScore, awayScore: m.awayScore },
-            pool.scoringConfig,
-            m.stage,
-          );
-        }, 0);
-        return { key, title: formatSectionTitle(key), totalCount: data.length, totalPts, data };
-      });
-  }, [matches, predictions]);
+  };
 
-  // Las secciones empiezan cerradas — el usuario las abre según necesite
+  const toggleMatch = (matchId: string) => {
+    setExpandedMatches((prev) => {
+      const next = new Set(prev);
+      if (next.has(matchId)) {
+        next.delete(matchId);
+      } else {
+        next.add(matchId);
+        loadParticipantPreds(matchId);
+      }
+      return next;
+    });
+  };
 
   const toggleSection = (key: string) => {
     setOpenSections((prev) => {
@@ -165,7 +212,147 @@ export default function ResultsScreen({ route }: any) {
     });
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  const maxPts = getMaxMatchPoints(pool.scoringConfig);
+
+  // Agrupar finalizados por fecha
+  const finishedSections = useMemo<DaySection[]>(() => {
+    const map = new Map<string, Match[]>();
+    for (const match of finishedMatches) {
+      const key = getDateKey(match);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(match);
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([key, data]) => {
+        const totalPts = data.reduce((sum, m) => {
+          const pred = myPredictions[m.id];
+          return sum + getMatchPoints(
+            pred,
+            { homeScore: m.homeScore, awayScore: m.awayScore },
+            pool.scoringConfig,
+            m.stage,
+          );
+        }, 0);
+        return { key, title: formatSectionTitle(key), totalCount: data.length, totalPts, data };
+      });
+  }, [finishedMatches, myPredictions]);
+
+  // ── Render de tarjeta de participantes ─────────────────────────────────────
+
+  const renderParticipants = (match: Match, isFinished: boolean) => {
+    const preds = participantPreds[match.id];
+    const isLoadingThis = loadingPreds.has(match.id);
+
+    if (isLoadingThis) {
+      return (
+        <View style={styles.participantsLoading}>
+          <ActivityIndicator size="small" color="#149435" />
+        </View>
+      );
+    }
+
+    if (!preds || preds.length === 0) {
+      return (
+        <View style={styles.participantsEmpty}>
+          <Text style={styles.participantsEmptyText}>Nadie ha predicho este partido aún</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.participantsList}>
+        {preds.map((p) => {
+          const isMe = p.userId === user?.id;
+          const hasPred = p.homeScore !== '' && p.awayScore !== '';
+
+          if (isFinished && hasPred) {
+            const breakdown = getMatchBreakdown(
+              { homeScore: p.homeScore, awayScore: p.awayScore },
+              { homeScore: match.homeScore, awayScore: match.awayScore },
+              pool.scoringConfig,
+              match.stage,
+            );
+            const badgeColor = getBadgeColor(breakdown.total, maxPts);
+            return (
+              <View key={p.userId} style={[styles.participantRow, isMe && styles.participantRowMe]}>
+                <Text style={[styles.participantName, isMe && styles.participantNameMe]} numberOfLines={1}>
+                  {isMe ? '⭐ Tú' : p.name}
+                </Text>
+                <Text style={styles.participantPred}>{p.homeScore} – {p.awayScore}</Text>
+                <View style={[styles.participantBadge, { backgroundColor: badgeColor }]}>
+                  <Text style={styles.participantBadgePts}>{breakdown.total} pts</Text>
+                </View>
+              </View>
+            );
+          }
+
+          // En curso o sin predicción
+          return (
+            <View key={p.userId} style={[styles.participantRow, isMe && styles.participantRowMe]}>
+              <Text style={[styles.participantName, isMe && styles.participantNameMe]} numberOfLines={1}>
+                {isMe ? '⭐ Tú' : p.name}
+              </Text>
+              <Text style={styles.participantPred}>
+                {hasPred ? `${p.homeScore} – ${p.awayScore}` : '–'}
+              </Text>
+              <View style={styles.participantBadgeEmpty}>
+                <Text style={styles.participantBadgeEmptyText}>En juego</Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
+  // ── Render de tarjeta de partido ───────────────────────────────────────────
+
+  const renderMatchCard = (match: Match, isLast: boolean, isFinished: boolean) => {
+    const isExpanded = expandedMatches.has(match.id);
+    const myPred = myPredictions[match.id];
+    const isKnockout = isFinished && myPred
+      ? getMatchBreakdown(myPred, { homeScore: match.homeScore, awayScore: match.awayScore }, pool.scoringConfig, match.stage).multiplied
+      : false;
+
+    return (
+      <View key={match.id} style={[styles.card, isLast && !isExpanded && styles.cardLast]}>
+        {/* Cabecera del partido — solo muestra el marcador, sin predicción propia */}
+        <TouchableOpacity
+          style={styles.cardHeader}
+          onPress={() => toggleMatch(match.id)}
+          activeOpacity={0.75}
+        >
+          <View style={styles.cardHeaderLeft}>
+            <Text style={styles.cardDate}>{match.date}</Text>
+            <Text style={styles.cardTeams}>
+              {getTeamName(match.home)}
+              {isFinished ? `  ${match.homeScore} – ${match.awayScore}  ` : '  vs  '}
+              {getTeamName(match.away)}
+            </Text>
+            {isKnockout && (
+              <View style={styles.knockoutBadge}>
+                <Text style={styles.knockoutText}>⚡ Eliminatoria</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.expandChevron}>{isExpanded ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
+
+        {/* Predicciones de participantes (expandido) */}
+        {isExpanded && (
+          <View style={[styles.participantsContainer, isLast && styles.participantsContainerLast]}>
+            <Text style={styles.participantsTitle}>
+              {isFinished ? '📊 Predicciones del grupo' : '👀 Predicciones en juego'}
+            </Text>
+            {renderParticipants(match, isFinished)}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  // ── Estados de carga / error / vacío ──────────────────────────────────────
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#149435" /></View>;
   if (loadError) return (
@@ -174,7 +361,9 @@ export default function ResultsScreen({ route }: any) {
     </View>
   );
 
-  if (matches.length === 0) {
+  const hasData = finishedMatches.length > 0 || inProgressMatches.length > 0;
+
+  if (!hasData) {
     return (
       <ScrollView
         style={styles.container}
@@ -184,7 +373,7 @@ export default function ResultsScreen({ route }: any) {
         <Text style={styles.emptyIcon}>⏳</Text>
         <Text style={styles.emptyTitle}>Sin resultados aún</Text>
         <Text style={styles.emptyText}>
-          Cuando terminen los primeros partidos aparecerán aquí.{'\n'}
+          Cuando comiencen los primeros partidos aparecerán aquí.{'\n'}
           Desliza hacia abajo para actualizar.
         </Text>
       </ScrollView>
@@ -198,98 +387,65 @@ export default function ResultsScreen({ route }: any) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#149435']} />}
       showsVerticalScrollIndicator={false}
     >
-      {sections.map((section) => {
-        const isOpen = openSections.has(section.key);
+      {/* ── Sección: En curso ─────────────────────────────────────────────── */}
+      {inProgressMatches.length > 0 && (
+        <View style={styles.groupBlock}>
+          <View style={styles.groupHeader}>
+            <View style={styles.liveIndicator} />
+            <Text style={styles.groupTitle}>En curso</Text>
+            <Text style={styles.groupCount}>{inProgressMatches.length}</Text>
+          </View>
+          <View style={styles.groupBody}>
+            {inProgressMatches.map((match, idx) =>
+              renderMatchCard(match, idx === inProgressMatches.length - 1, false)
+            )}
+          </View>
+        </View>
+      )}
 
-        return (
-          <View key={section.key} style={styles.sectionBlock}>
+      {/* ── Sección: Finalizados ──────────────────────────────────────────── */}
+      {finishedSections.length > 0 && (
+        <View style={styles.groupBlock}>
+          <View style={[styles.groupHeader, styles.groupHeaderDark]}>
+            <Text style={styles.groupHeaderDarkText}>✅  Finalizados</Text>
+            <Text style={[styles.groupCount, styles.groupCountDark]}>{finishedMatches.length}</Text>
+          </View>
 
-            {/* ── Cabecera de jornada ──────────────────────────── */}
-            <TouchableOpacity
-              style={[styles.sectionHeader, isOpen && styles.sectionHeaderOpen]}
-              onPress={() => toggleSection(section.key)}
-              activeOpacity={0.75}
-            >
-              <View>
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-                <Text style={styles.sectionSub}>
-                  {section.totalCount} partido{section.totalCount !== 1 ? 's' : ''}
-                </Text>
-              </View>
-              <View style={styles.sectionRight}>
-                {section.totalPts > 0 && (
-                  <View style={styles.ptsBadge}>
-                    <Text style={styles.ptsBadgeText}>+{section.totalPts} pts</Text>
+          {finishedSections.map((section) => {
+            const isOpen = openSections.has(section.key);
+            return (
+              <View key={section.key} style={styles.sectionBlock}>
+                {/* Cabecera de jornada */}
+                <TouchableOpacity
+                  style={[styles.sectionHeader, isOpen && styles.sectionHeaderOpen]}
+                  onPress={() => toggleSection(section.key)}
+                  activeOpacity={0.75}
+                >
+                  <View>
+                    <Text style={styles.sectionTitle}>{section.title}</Text>
+                    <Text style={styles.sectionSub}>
+                      {section.totalCount} partido{section.totalCount !== 1 ? 's' : ''}
+                    </Text>
                   </View>
-                )}
-                <Text style={styles.chevron}>{isOpen ? '▲' : '▼'}</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* ── Tarjetas de resultado ─────────────────────────── */}
-            {isOpen && section.data.map((match, idx) => {
-              const pred = predictions[match.id];
-              const result = { homeScore: match.homeScore, awayScore: match.awayScore };
-              const breakdown = getMatchBreakdown(pred, result, pool.scoringConfig, match.stage);
-              const badgeColor = getBadgeColor(breakdown.total, maxPts);
-              const isKnockout = breakdown.multiplied;
-              const isLast = idx === section.data.length - 1;
-
-              return (
-                <View key={match.id} style={[styles.card, isLast && styles.cardLast]}>
-                  <View style={styles.cardTop}>
-                    <Text style={styles.cardDate}>{match.date}</Text>
-                    {isKnockout && (
-                      <View style={styles.knockoutBadge}>
-                        <Text style={styles.knockoutText}>⚡ Eliminatoria</Text>
+                  <View style={styles.sectionRight}>
+                    {section.totalPts > 0 && (
+                      <View style={styles.sectionPtsBadge}>
+                        <Text style={styles.sectionPtsBadgeText}>+{section.totalPts} pts</Text>
                       </View>
                     )}
+                    <Text style={styles.chevron}>{isOpen ? '▲' : '▼'}</Text>
                   </View>
+                </TouchableOpacity>
 
-                  <View style={styles.resultRow}>
-                    <View style={styles.matchInfo}>
-                      <Text style={styles.matchTitle}>
-                        {getTeamName(match.home)}  {match.homeScore} – {match.awayScore}  {getTeamName(match.away)}
-                      </Text>
-                      <Text style={styles.predLabel}>
-                        Tu predicción:{' '}
-                        {pred ? `${pred.homeScore || '?'} – ${pred.awayScore || '?'}` : 'Sin predicción'}
-                      </Text>
-
-                      {/* Desglose de puntos */}
-                      {pred && breakdown.total > 0 && (
-                        <View style={styles.breakdown}>
-                          {breakdown.resultado > 0 && (
-                            <Text style={styles.breakdownItem}>✓ Resultado +{breakdown.resultado}</Text>
-                          )}
-                          {breakdown.golesLocal > 0 && (
-                            <Text style={styles.breakdownItem}>✓ Goles local +{breakdown.golesLocal}</Text>
-                          )}
-                          {breakdown.golesVisitante > 0 && (
-                            <Text style={styles.breakdownItem}>✓ Goles visit. +{breakdown.golesVisitante}</Text>
-                          )}
-                          {breakdown.diferencia > 0 && (
-                            <Text style={styles.breakdownItem}>✓ Diferencia +{breakdown.diferencia}</Text>
-                          )}
-                          {isKnockout && (
-                            <Text style={[styles.breakdownItem, styles.breakdownKnockout]}>⚡ ×2 eliminatoria</Text>
-                          )}
-                        </View>
-                      )}
-                    </View>
-
-                    <View style={[styles.badge, { backgroundColor: badgeColor }]}>
-                      <Text style={styles.badgePts}>{breakdown.total}</Text>
-                      <Text style={styles.badgePtsLabel}>pts</Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
-
-          </View>
-        );
-      })}
+                {/* Partidos de la jornada */}
+                {isOpen && section.data.map((match, idx) =>
+                  renderMatchCard(match, idx === section.data.length - 1, true)
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -307,70 +463,121 @@ const styles = StyleSheet.create({
     flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24,
   },
   errorText: { color: '#64748B', textAlign: 'center', fontSize: 14, lineHeight: 22 },
-
   emptyIcon: { fontSize: 48, marginBottom: 14 },
   emptyTitle: { fontSize: 17, fontWeight: 'bold', color: '#374151', marginBottom: 8 },
   emptyText: { color: '#64748B', textAlign: 'center', fontSize: 14, lineHeight: 21 },
 
-  // ── Bloque de sección ───────────────────────────────────────────────────────
-  sectionBlock: {
-    marginBottom: 14,
-    borderRadius: 12,
+  // ── Bloque de grupo (En curso / Finalizados) ────────────────────────────────
+  groupBlock: { marginBottom: 16 },
+  groupHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 4, paddingBottom: 8,
+  },
+  liveIndicator: {
+    width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444',
+  },
+  groupTitle: { fontSize: 13, fontWeight: '700', color: '#374151', flex: 1 },
+  groupCount: {
+    fontSize: 12, fontWeight: '600', color: '#94A3B8',
+    backgroundColor: '#E2E8F0', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10,
+  },
+  groupHeaderDark: {
+    backgroundColor: '#0F172A', borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 12,
+    marginBottom: 8,
+  },
+  groupHeaderDarkText: { fontSize: 14, fontWeight: '700', color: 'white', flex: 1 },
+  groupCountDark: { backgroundColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.8)' },
+  groupBody: {
+    borderRadius: 12, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
 
+  // ── Sección de jornada (dentro de Finalizados) ──────────────────────────────
+  sectionBlock: {
+    marginBottom: 10,
+    borderRadius: 12,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 }, elevation: 2,
+  },
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#0F172A', borderRadius: 12,
-    paddingHorizontal: 16, paddingVertical: 13,
+    backgroundColor: '#1E293B', borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 12,
   },
-  sectionHeaderOpen: {
-    borderBottomLeftRadius: 0, borderBottomRightRadius: 0,
-  },
-  sectionTitle: {
-    fontSize: 14, fontWeight: '700', color: 'white',
-  },
-  sectionSub: { fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 2 },
-  sectionRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  chevron: { fontSize: 12, color: 'rgba(255,255,255,0.6)' },
-
-  // Badge de puntos del día
-  ptsBadge: {
-    backgroundColor: '#F0FDF4', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3,
+  sectionHeaderOpen: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: 'white' },
+  sectionSub: { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
+  sectionRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  chevron: { fontSize: 11, color: 'rgba(255,255,255,0.5)' },
+  sectionPtsBadge: {
+    backgroundColor: '#F0FDF4', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2,
     borderWidth: 1, borderColor: '#86EFAC',
   },
-  ptsBadgeText: { fontSize: 12, fontWeight: '700', color: '#149435' },
+  sectionPtsBadgeText: { fontSize: 11, fontWeight: '700', color: '#149435' },
 
-  // ── Tarjeta de resultado (embebida) ─────────────────────────────────────────
+  // ── Tarjeta de partido ──────────────────────────────────────────────────────
   card: {
-    backgroundColor: 'white', padding: 14,
-    borderTopWidth: 1, borderTopColor: '#F4EBD8',
+    backgroundColor: 'white',
+    borderTopWidth: 1, borderTopColor: '#F1F5F9',
   },
-  cardLast: {
-    borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
+  cardLast: { borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
+  cardHeader: {
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
+    padding: 14,
   },
-  cardTop: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8,
-  },
-  cardDate: { fontSize: 11, color: '#94A3B8' },
+  cardHeaderLeft: { flex: 1, marginRight: 10 },
+  cardDate: { fontSize: 11, color: '#94A3B8', marginBottom: 4 },
+  cardTeams: { fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 3 },
   knockoutBadge: {
+    marginTop: 4, alignSelf: 'flex-start',
     backgroundColor: '#F5F3FF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
   },
   knockoutText: { fontSize: 11, color: '#7C3AED', fontWeight: '600' },
-  resultRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  matchInfo: { flex: 1, marginRight: 12 },
-  matchTitle: { fontWeight: '700', color: '#0F172A', fontSize: 14, marginBottom: 4 },
-  predLabel: { color: '#64748B', fontSize: 13, marginBottom: 6 },
-  breakdown: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  breakdownItem: {
-    fontSize: 11, color: '#149435', backgroundColor: '#F0FDF4',
-    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+  expandChevron: { fontSize: 11, color: '#94A3B8', marginTop: 4 },
+
+  // ── Participantes expandidos ────────────────────────────────────────────────
+  participantsContainer: {
+    borderTopWidth: 1, borderTopColor: '#F1F5F9',
+    backgroundColor: '#FAFAFA', padding: 12,
   },
-  breakdownKnockout: { color: '#7C3AED', backgroundColor: '#F5F3FF' },
-  badge: {
-    paddingHorizontal: 10, paddingVertical: 8, borderRadius: 20, minWidth: 56, alignItems: 'center',
+  participantsContainerLast: {
+    borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
   },
-  badgePts: { color: 'white', fontWeight: 'bold', fontSize: 18, lineHeight: 22 },
-  badgePtsLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 10 },
+  participantsTitle: {
+    fontSize: 11, fontWeight: '700', color: '#94A3B8',
+    textTransform: 'uppercase', letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  participantsLoading: { paddingVertical: 12, alignItems: 'center' },
+  participantsEmpty: { paddingVertical: 8 },
+  participantsEmptyText: { fontSize: 13, color: '#94A3B8', textAlign: 'center' },
+  participantsList: { gap: 6 },
+  participantRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'white', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 8,
+    borderWidth: 1, borderColor: '#F1F5F9',
+  },
+  participantRowMe: {
+    borderColor: '#BBF7D0', backgroundColor: '#F0FDF4',
+  },
+  participantName: {
+    flex: 1, fontSize: 13, color: '#374151', fontWeight: '500',
+  },
+  participantNameMe: { color: '#149435', fontWeight: '700' },
+  participantPred: {
+    fontSize: 13, fontWeight: '600', color: '#0F172A',
+    marginHorizontal: 12, minWidth: 48, textAlign: 'center',
+  },
+  participantBadge: {
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, minWidth: 56, alignItems: 'center',
+  },
+  participantBadgePts: { color: 'white', fontWeight: '700', fontSize: 12 },
+  participantBadgeEmpty: {
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, minWidth: 56, alignItems: 'center',
+    backgroundColor: '#FEF9C3', borderWidth: 1, borderColor: '#FDE68A',
+  },
+  participantBadgeEmptyText: { fontSize: 11, fontWeight: '600', color: '#92400E' },
 });
