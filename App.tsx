@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { OneSignal } from 'react-native-onesignal';
 import mobileAds from 'react-native-google-mobile-ads';
+import { StatusBar } from 'expo-status-bar';
 import AppNavigator from './navigation/AppNavigator';
 import { AppProvider } from './context/AppContext';
 import { supabase } from './services/supabase';
@@ -54,6 +55,7 @@ export default function App() {
 
   return (
     <AppProvider>
+      <StatusBar style="light" backgroundColor="#000000" translucent={false} />
       <AppNavigator />
     </AppProvider>
   );

@@ -21,6 +21,11 @@ module.exports = {
     ios: {
       supportsTablet: true,
     },
+    androidStatusBar: {
+      backgroundColor: '#000000',
+      barStyle: 'light-content',
+      translucent: false,
+    },
     android: {
       package: 'com.prolla.app',
       // En EAS Build, GOOGLE_SERVICES_JSON es la ruta al secreto de archivo.
