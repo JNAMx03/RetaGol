@@ -100,28 +100,69 @@ export default function PredictionsScreen({ route }: any) {
   const [savedMsg, setSavedMsg] = useState(false);
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
 
-  // IDs de partidos que ya tienen resultado real (no editables)
-  const finishedIds = useMemo(() => new Set(
-    (pool.matches as Match[])
-      .filter((m) => m.homeScore !== '' && m.awayScore !== '')
-      .map((m) => m.id),
-  ), [pool.matches]);
+  // Resultados frescos desde Supabase (utc_date + home_score actualizados)
+  const [freshResults, setFreshResults] = useState<Record<string, { homeScore: string; awayScore: string; utcDate?: string }>>({});
 
-  const finishedCount = finishedIds.size;
+  // IDs de partidos bloqueados: ya tienen resultado O ya empezaron (utcDate <= ahora)
+  // Usa freshResults para no depender del estado stale de pool.matches
+  const lockedIds = useMemo(() => {
+    const now = new Date();
+    return new Set(
+      (pool.matches as Match[])
+        .filter((m) => {
+          const fresh = freshResults[m.id];
+          const hasResult = fresh
+            ? fresh.homeScore !== '' && fresh.awayScore !== ''
+            : m.homeScore !== '' && m.awayScore !== '';
+          const utcDate = fresh?.utcDate ?? m.utcDate;
+          const hasStarted = utcDate ? new Date(utcDate) <= now : false;
+          return hasResult || hasStarted;
+        })
+        .map((m) => m.id),
+    );
+  }, [pool.matches, freshResults]);
 
-  // Cargar predicciones guardadas desde Supabase
+  // Solo partidos con resultado real (para el banner informativo)
+  const finishedCount = useMemo(
+    () => Object.values(freshResults).filter((r) => r.homeScore !== '' && r.awayScore !== '').length,
+    [freshResults],
+  );
+
+  // Partidos iniciados pero sin resultado aún (en curso)
+  const inProgressCount = lockedIds.size - finishedCount;
+
+  // Cargar estado fresco de partidos + predicciones del usuario desde Supabase
   useEffect(() => {
-    const fetchPredictions = async () => {
+    const fetchData = async () => {
       try {
-        const { data, error } = await supabase
+        // Resultados y fechas frescos (para saber si el partido ya inició)
+        const { data: freshMatches } = await supabase
+          .from('matches')
+          .select('id, home_score, away_score, utc_date')
+          .eq('pool_id', pool.id);
+
+        if (freshMatches) {
+          const map: Record<string, { homeScore: string; awayScore: string; utcDate?: string }> = {};
+          freshMatches.forEach((m) => {
+            map[m.id] = {
+              homeScore: m.home_score ?? '',
+              awayScore: m.away_score ?? '',
+              utcDate: m.utc_date ?? undefined,
+            };
+          });
+          setFreshResults(map);
+        }
+
+        // Predicciones guardadas del usuario
+        const { data: preds } = await supabase
           .from('predictions')
           .select('match_id, home_score, away_score')
           .eq('pool_id', pool.id)
           .eq('user_id', user?.id ?? '');
 
-        if (!error && data && data.length > 0) {
+        if (preds && preds.length > 0) {
           const scoreMap = new Map(
-            data.map((p) => [p.match_id, { homeScore: p.home_score ?? '', awayScore: p.away_score ?? '' }]),
+            preds.map((p) => [p.match_id, { homeScore: p.home_score ?? '', awayScore: p.away_score ?? '' }]),
           );
           setMatches((prev) =>
             prev.map((m) => ({
@@ -137,7 +178,7 @@ export default function PredictionsScreen({ route }: any) {
         setLoadingPreds(false);
       }
     };
-    fetchPredictions();
+    fetchData();
   }, []);
 
   const handleChange = (id: string, field: string, value: string) => {
@@ -148,7 +189,7 @@ export default function PredictionsScreen({ route }: any) {
     setSaving(true);
     try {
       const filledMatches = matches.filter(
-        (m) => !finishedIds.has(m.id) && (m.homeScore !== '' || m.awayScore !== ''),
+        (m) => !lockedIds.has(m.id) && (m.homeScore !== '' || m.awayScore !== ''),
       );
       await savePredictionsByPool(pool.id, filledMatches);
       setSavedMsg(true);
@@ -160,10 +201,10 @@ export default function PredictionsScreen({ route }: any) {
     }
   };
 
-  // Solo partidos pendientes → agrupar por fecha cronológicamente
+  // Solo partidos no bloqueados (sin resultado Y que aún no han empezado)
   const pendingMatches = useMemo(
-    () => matches.filter((m) => !finishedIds.has(m.id)),
-    [matches, finishedIds],
+    () => matches.filter((m) => !lockedIds.has(m.id)),
+    [matches, lockedIds],
   );
 
   const sections = useMemo<DaySection[]>(() => {
@@ -198,11 +239,15 @@ export default function PredictionsScreen({ route }: any) {
   if (pendingMatches.length === 0) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emptyIcon}>✅</Text>
-        <Text style={styles.emptyTitle}>Todo finalizado</Text>
+        <Text style={styles.emptyIcon}>{finishedCount === lockedIds.size ? '✅' : '🔴'}</Text>
+        <Text style={styles.emptyTitle}>
+          {finishedCount === lockedIds.size ? 'Todo finalizado' : 'Partidos en curso'}
+        </Text>
         <Text style={styles.emptyText}>
-          Todos los partidos ya tienen resultado.{'\n'}
-          Ve a Resultados para ver tus puntos.
+          {finishedCount === lockedIds.size
+            ? 'Todos los partidos ya tienen resultado.\nVe a Resultados para ver tus puntos.'
+            : 'Los partidos ya comenzaron y no se pueden editar.\nVe a Resultados para seguirlos en vivo.'
+          }
         </Text>
       </View>
     );
@@ -268,12 +313,15 @@ export default function PredictionsScreen({ route }: any) {
           );
         })}
 
-        {/* Banner de partidos ya finalizados */}
-        {finishedCount > 0 && (
+        {/* Banner de partidos bloqueados */}
+        {lockedIds.size > 0 && (
           <View style={styles.finishedBanner}>
             <Text>🔒</Text>
             <Text style={styles.finishedText}>
-              {finishedCount} partido{finishedCount !== 1 ? 's' : ''} ya con resultado — ve a Resultados
+              {inProgressCount > 0 && `${inProgressCount} partido${inProgressCount !== 1 ? 's' : ''} en curso`}
+              {inProgressCount > 0 && finishedCount > 0 && ' · '}
+              {finishedCount > 0 && `${finishedCount} finalizado${finishedCount !== 1 ? 's' : ''}`}
+              {' — ve a Resultados'}
             </Text>
           </View>
         )}

@@ -52,10 +52,10 @@ serve(async () => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
-  // Partidos con api_id definido pero sin resultado todavía
-  const { data: matches, error } = await supabase
+  // 1. Partidos sin resultado que tienen api_id
+  const { data: unsyncedMatches, error } = await supabase
     .from('matches')
-    .select('*')
+    .select('id, api_id, pool_id')
     .is('home_score', null)
     .not('api_id', 'is', null);
 
@@ -63,47 +63,91 @@ serve(async () => {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 
-  if (!matches || matches.length === 0) {
+  if (!unsyncedMatches || unsyncedMatches.length === 0) {
     return new Response(JSON.stringify({ updated: 0, total: 0 }), {
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
+  // 2. Obtener el tipo (código de competición) de cada polla afectada
+  const uniquePoolIds = [...new Set(unsyncedMatches.map((m: any) => m.pool_id))];
+  const { data: pools } = await supabase
+    .from('pools')
+    .select('id, type')
+    .in('id', uniquePoolIds);
+
+  const poolTypeMap = new Map((pools ?? []).map((p: any) => [p.id, p.type as string]));
+
+  // 3. Agrupar api_ids por competición y construir índice para lookup rápido
+  const competitionApiIds = new Map<string, Set<number>>();
+  const matchesByApiId    = new Map<number, { id: string; pool_id: string }[]>();
+
+  for (const m of unsyncedMatches) {
+    const compCode = poolTypeMap.get(m.pool_id);
+    if (!compCode) continue;
+
+    if (!competitionApiIds.has(compCode)) competitionApiIds.set(compCode, new Set());
+    competitionApiIds.get(compCode)!.add(m.api_id);
+
+    if (!matchesByApiId.has(m.api_id)) matchesByApiId.set(m.api_id, []);
+    matchesByApiId.get(m.api_id)!.push({ id: m.id, pool_id: m.pool_id });
+  }
+
+  const FOOTBALL_DATA_KEY = Deno.env.get('FOOTBALL_DATA_KEY')!;
   let updated = 0;
   const updatedPoolIds = new Set<string>();
 
-  // ─── Actualizar marcadores desde football-data.org ────────────────────────
-
-  for (const match of matches) {
+  // 4. UNA sola llamada API por competición (en vez de una por partido)
+  //    Ejemplo: WC tiene 64 partidos → antes: 64 llamadas, ahora: 1 llamada
+  for (const [compCode, apiIds] of competitionApiIds) {
     try {
       const res = await fetch(
-        `https://api.football-data.org/v4/matches/${match.api_id}`,
-        { headers: { 'X-Auth-Token': Deno.env.get('FOOTBALL_DATA_KEY')! } },
+        `https://api.football-data.org/v4/competitions/${compCode}/matches?status=FINISHED`,
+        { headers: { 'X-Auth-Token': FOOTBALL_DATA_KEY } },
       );
 
-      const data = await res.json();
+      if (!res.ok) {
+        const text = await res.text();
+        console.error(`API error ${compCode}: HTTP ${res.status} — ${text}`);
+        continue;
+      }
 
-      if (data.status === 'FINISHED') {
-        await supabase
+      const data = await res.json();
+      const finishedMatches: any[] = data.matches ?? [];
+
+      for (const apiMatch of finishedMatches) {
+        if (!apiIds.has(apiMatch.id)) continue;
+
+        const homeScore = apiMatch.score?.fullTime?.home;
+        const awayScore = apiMatch.score?.fullTime?.away;
+        if (homeScore == null || awayScore == null) continue;
+
+        // Actualiza TODAS las filas con este api_id (una por cada polla que lo tiene)
+        const { error: updateError } = await supabase
           .from('matches')
           .update({
-            home_score: String(data.score.fullTime.home ?? 0),
-            away_score: String(data.score.fullTime.away ?? 0),
+            home_score: String(homeScore),
+            away_score: String(awayScore),
           })
-          .eq('id', match.id);
+          .eq('api_id', apiMatch.id)
+          .is('home_score', null);
 
-        updatedPoolIds.add(match.pool_id);
-        updated++;
+        if (!updateError) {
+          updated++;
+          const affected = matchesByApiId.get(apiMatch.id) ?? [];
+          for (const { pool_id } of affected) {
+            updatedPoolIds.add(pool_id);
+          }
+        }
       }
     } catch (e) {
-      console.error(`Error sincronizando match ${match.id}:`, e);
+      console.error(`Error procesando competición ${compCode}:`, e);
     }
   }
 
   // ─── Notificar + actualizar stats por cada polla con cambios ──────────────
 
   for (const poolId of updatedPoolIds) {
-    // ── Notificación push ────────────────────────────────────────────────────
     try {
       const { data: participants } = await supabase
         .from('pool_participants')
@@ -129,11 +173,9 @@ serve(async () => {
         );
       }
 
-      // ── Actualizar user_pool_stats ─────────────────────────────────────────
-      // Se ejecuta aunque no haya jugadores con push registrado
       if (!pool) continue;
 
-      // 1. Todos los partidos finalizados de esta polla
+      // Partidos finalizados de esta polla
       const { data: finishedMatches } = await supabase
         .from('matches')
         .select('id, home_score, away_score, stage')
@@ -143,7 +185,6 @@ serve(async () => {
 
       if (!finishedMatches || finishedMatches.length === 0) continue;
 
-      // Mapa rápido: match_id → resultado
       const resultMap = new Map(
         finishedMatches.map((m: any) => [
           m.id,
@@ -151,7 +192,6 @@ serve(async () => {
         ]),
       );
 
-      // 2. Todas las predicciones de esta polla
       const { data: allPredictions } = await supabase
         .from('predictions')
         .select('user_id, match_id, home_score, away_score')
@@ -159,7 +199,6 @@ serve(async () => {
 
       if (!allPredictions || allPredictions.length === 0) continue;
 
-      // 3. Agrupar predicciones por usuario
       const byUser = new Map<string, typeof allPredictions>();
       for (const pred of allPredictions) {
         if (!byUser.has(pred.user_id)) byUser.set(pred.user_id, []);
@@ -167,8 +206,6 @@ serve(async () => {
       }
 
       const config: ScoringConfig = pool.scoring_config ?? {};
-
-      // 4. Calcular stats por participante y preparar upsert
       const statsRows: object[] = [];
 
       for (const [userId, preds] of byUser) {
@@ -179,7 +216,7 @@ serve(async () => {
 
         for (const pred of preds) {
           const result = resultMap.get(pred.match_id);
-          if (!result) continue; // partido sin resultado aún → no contar
+          if (!result) continue;
 
           const pts = calcPoints(pred, result, config);
           const isExact = pred.home_score === result.homeScore
@@ -202,7 +239,6 @@ serve(async () => {
         });
       }
 
-      // 5. Upsert en bloque — service role bypasses RLS
       if (statsRows.length > 0) {
         const { error: statsError } = await supabase
           .from('user_pool_stats')
@@ -218,7 +254,7 @@ serve(async () => {
     }
   }
 
-  return new Response(JSON.stringify({ updated, total: matches.length }), {
+  return new Response(JSON.stringify({ updated, total: unsyncedMatches.length }), {
     headers: { 'Content-Type': 'application/json' },
   });
 });
