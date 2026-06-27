@@ -31,6 +31,7 @@ export interface Pool {
   type: string;
   code: string;
   creatorId: string;   // para saber quién puede borrar la polla
+  open: boolean;       // si acepta nuevos participantes
   participants: number;
   matches: Match[];
   createdAt: string;
@@ -90,6 +91,7 @@ const mapPool = (pool: any, matches: any[]): Pool => ({
   type: pool.type,
   code: pool.code,
   creatorId: pool.creator_id ?? '',
+  open: pool.open ?? true,
   participants: pool.participants,
   createdAt: pool.created_at,
   // Mezclar con DEFAULT_SCORING para que pollas viejas (formato { exact, oneTeam, ... })
@@ -554,7 +556,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     if (poolError || !pool) throw new Error('No se encontró ninguna polla con ese código.');
 
-    // 2. Verificar si ya es participante
+    // 2. Verificar que la polla acepta nuevos participantes
+    if (pool.open === false) throw new Error('POLLA_CERRADA');
+
+    // 3. Verificar si ya es participante
     const { data: existing } = await supabase
       .from('pool_participants')
       .select('user_id')

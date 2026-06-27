@@ -37,6 +37,8 @@ export default function JoinPoolScreen({ navigation }: any) {
       if (e.message === 'YA_PARTICIPANTE') {
         Alert.alert('Ya estás en esta polla', 'Puedes verla en tu pantalla principal.');
         navigation.goBack();
+      } else if (e.message === 'POLLA_CERRADA') {
+        setError('Esta polla ya no acepta nuevos participantes.');
       } else {
         setError(e.message ?? 'Error al unirse a la polla');
       }

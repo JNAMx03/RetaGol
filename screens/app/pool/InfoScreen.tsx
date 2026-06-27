@@ -1,5 +1,5 @@
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Switch,
 } from 'react-native';
 import { useState, useEffect } from 'react';
 import { CommonActions } from '@react-navigation/native';
@@ -27,10 +27,13 @@ function formatDate(d: Date): string {
 
 export default function InfoScreen({ route, navigation }: any) {
   const pool: Pool = route.params.pool;
-  const { user } = useApp();
+  const { user, refreshPools } = useApp();
   const [scoringOpen, setScoringOpen] = useState(false);
   const [prizeOpen, setPrizeOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [poolOpen, setPoolOpen] = useState(pool.open ?? true);
+  const [togglingOpen, setTogglingOpen] = useState(false);
 
   // Picks del torneo del usuario actual
   const [picks, setPicks] = useState<{ champion: string | null; runner_up: string | null; third_place: string | null } | null>(null);
@@ -65,6 +68,61 @@ export default function InfoScreen({ route, navigation }: any) {
     pool.matches.every((m) => m.homeScore !== '' && m.awayScore !== '');
 
   const expiryDate = allFinished ? getExpiryDate(pool) : null;
+
+  // ── Salir de la polla ────────────────────────────────────────────────────────
+
+  const handleLeave = () => {
+    Alert.alert(
+      'Salir de la polla',
+      `¿Estás seguro de que quieres salir de "${pool.name}"?\n\nPerderás el acceso a los partidos y resultados.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Sí, salir', style: 'destructive', onPress: confirmLeave },
+      ],
+    );
+  };
+
+  const confirmLeave = async () => {
+    setLeaving(true);
+    try {
+      const { error } = await supabase
+        .from('pool_participants')
+        .delete()
+        .eq('pool_id', pool.id)
+        .eq('user_id', user!.id);
+
+      if (error) throw error;
+
+      await refreshPools();
+      navigation.dispatch(
+        CommonActions.reset({ index: 0, routes: [{ name: 'Home' }] }),
+      );
+    } catch {
+      Alert.alert('Error', 'No se pudo salir de la polla. Verifica tu conexión e intenta de nuevo.');
+    } finally {
+      setLeaving(false);
+    }
+  };
+
+  // ── Toggle ingreso de nuevos participantes ────────────────────────────────────
+
+  const handleToggleOpen = async (value: boolean) => {
+    setTogglingOpen(true);
+    const prev = poolOpen;
+    setPoolOpen(value); // optimistic update
+    try {
+      const { error } = await supabase
+        .from('pools')
+        .update({ open: value })
+        .eq('id', pool.id);
+      if (error) throw error;
+    } catch {
+      setPoolOpen(prev); // revertir si falla
+      Alert.alert('Error', 'No se pudo actualizar la configuración.');
+    } finally {
+      setTogglingOpen(false);
+    }
+  };
 
   // ── Borrar polla ─────────────────────────────────────────────────────────────
 
@@ -307,10 +365,45 @@ export default function InfoScreen({ route, navigation }: any) {
         </View>
       )}
 
+      {/* ── Salir de la polla (solo participantes, no el creador) ──────── */}
+      {!isCreator && (
+        <TouchableOpacity
+          style={[styles.btnLeave, leaving && styles.btnLeaveDisabled]}
+          onPress={handleLeave}
+          disabled={leaving}
+          activeOpacity={0.8}
+        >
+          {leaving
+            ? <ActivityIndicator color="#92400E" size="small" />
+            : <Text style={styles.btnLeaveText}>Salir de la polla</Text>
+          }
+        </TouchableOpacity>
+      )}
+
       {/* ── Zona peligrosa (solo creador) ────────────────────────────────── */}
       {isCreator && (
         <View style={styles.dangerZone}>
           <Text style={styles.dangerTitle}>Zona del creador</Text>
+
+          {/* Toggle: permitir nuevos ingresos */}
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleInfo}>
+              <Text style={styles.toggleLabel}>Permitir nuevos ingresos</Text>
+              <Text style={styles.toggleDesc}>
+                {poolOpen ? 'La polla acepta nuevos participantes' : 'La polla está cerrada a nuevos participantes'}
+              </Text>
+            </View>
+            <Switch
+              value={poolOpen}
+              onValueChange={handleToggleOpen}
+              disabled={togglingOpen}
+              trackColor={{ false: '#CBD5E1', true: '#86EFAC' }}
+              thumbColor={poolOpen ? '#149435' : '#94A3B8'}
+            />
+          </View>
+
+          <View style={styles.dangerDivider} />
+
           <Text style={styles.dangerDesc}>
             Solo tú puedes borrar esta polla. Esta acción eliminará todos los datos y no se puede deshacer.
           </Text>
@@ -420,14 +513,29 @@ const styles = StyleSheet.create({
   },
   noPicksText: { fontSize: 13, color: '#94A3B8' },
 
+  // Salir de la polla
+  btnLeave: {
+    backgroundColor: '#FEF3C7', borderRadius: 12, paddingVertical: 14,
+    alignItems: 'center', borderWidth: 1.5, borderColor: '#FCD34D', marginBottom: 12,
+  },
+  btnLeaveDisabled: { opacity: 0.5 },
+  btnLeaveText: { color: '#92400E', fontWeight: '700', fontSize: 15 },
+
   // Zona peligrosa
   dangerZone: {
     backgroundColor: 'white', borderRadius: 14, padding: 16, marginTop: 4,
     borderWidth: 1.5, borderColor: '#FEE2E2',
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1,
   },
-  dangerTitle: { fontSize: 13, fontWeight: '700', color: '#DC2626', marginBottom: 6 },
+  dangerTitle: { fontSize: 13, fontWeight: '700', color: '#DC2626', marginBottom: 12 },
   dangerDesc: { fontSize: 13, color: '#64748B', lineHeight: 19, marginBottom: 14 },
+  dangerDivider: { height: 1, backgroundColor: '#FEE2E2', marginVertical: 14 },
+  toggleRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+  },
+  toggleInfo: { flex: 1 },
+  toggleLabel: { fontSize: 14, fontWeight: '600', color: '#0F172A', marginBottom: 2 },
+  toggleDesc: { fontSize: 12, color: '#64748B', lineHeight: 17 },
   btnDelete: {
     backgroundColor: '#DC2626', borderRadius: 10, paddingVertical: 13,
     alignItems: 'center',
