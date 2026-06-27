@@ -35,7 +35,6 @@ module.exports = {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#ffffff',
       },
-      edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
       // Hace que el teclado empuje el contenido hacia arriba en lugar de taparlo
       softwareKeyboardLayoutMode: 'pan',
