@@ -23,23 +23,15 @@ serve(async (req) => {
       });
     }
 
-    const { data: creator } = await supabase
-      .from('profiles')
-      .select('onesignal_player_id')
-      .eq('id', pool.creator_id)
-      .single();
-
-    if (creator?.onesignal_player_id) {
-      await sendPushNotification(
-        [creator.onesignal_player_id],
-        'Nuevo participante',
-        `${joiner_name} se unió a tu polla "${pool_name}"`,
-        { type: 'join', pool_id },
-      );
-    }
+    await sendPushNotification(
+      [pool.creator_id],
+      'Nuevo participante',
+      `${joiner_name} se unió a tu polla "${pool_name}"`,
+      { type: 'join', pool_id },
+    );
 
     return new Response(
-      JSON.stringify({ sent: !!creator?.onesignal_player_id }),
+      JSON.stringify({ sent: true }),
       { headers: { 'Content-Type': 'application/json' } },
     );
   } catch (e) {

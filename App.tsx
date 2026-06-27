@@ -19,36 +19,27 @@ export default function App() {
       OneSignal.Notifications.requestPermission(true);
     }
 
-    // Guarda el subscription ID de OneSignal en el perfil del usuario autenticado.
-    // Se llama en tres momentos para cubrir todos los casos:
-    //   1. Al iniciar la app (si ya hay sesión activa)
-    //   2. Cuando OneSignal asigna/renueva el ID (evento 'change')
-    //   3. Cuando el usuario inicia sesión (evento SIGNED_IN de Supabase)
-    const savePlayerId = async () => {
-      const id = (OneSignal.User.pushSubscription as any).id as string | undefined;
-      if (!id) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from('profiles')
-          .update({ onesignal_player_id: id })
-          .eq('id', user.id);
+    // Vincula el dispositivo actual al usuario de Supabase usando OneSignal.login(userId).
+    // Esto reemplaza el enfoque anterior de guardar onesignal_player_id en profiles:
+    // OneSignal asocia internamente el external_id (= user.id) con el dispositivo,
+    // y las Edge Functions envían por external_id sin necesitar la columna en BD.
+    if (ONESIGNAL_APP_ID) {
+      // Al arrancar: si ya hay sesión activa, vincular de inmediato
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) OneSignal.login(user.id);
+      });
+    }
+
+    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!ONESIGNAL_APP_ID) return;
+      if (event === 'SIGNED_IN' && session?.user?.id) {
+        OneSignal.login(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        OneSignal.logout();
       }
-    };
-
-    // Caso 1: sesión activa al arrancar
-    savePlayerId();
-
-    // Caso 2: OneSignal renueva o asigna el ID por primera vez
-    OneSignal.User.pushSubscription.addEventListener('change', savePlayerId);
-
-    // Caso 3: usuario acaba de iniciar sesión (el ID ya estaba listo pero no había usuario)
-    const { data: { subscription: authSub } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') savePlayerId();
     });
 
     return () => {
-      OneSignal.User.pushSubscription.removeEventListener('change', savePlayerId);
       authSub.unsubscribe();
     };
   }, []);

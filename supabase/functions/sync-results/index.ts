@@ -52,7 +52,7 @@ serve(async () => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
-  // 1. Partidos sin resultado que tienen api_id
+  // 1a. Partidos sin resultado que tienen api_id (sincronizan + disparan notificación)
   const { data: unsyncedMatches, error } = await supabase
     .from('matches')
     .select('id, api_id, pool_id')
@@ -63,14 +63,31 @@ serve(async () => {
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 
-  if (!unsyncedMatches || unsyncedMatches.length === 0) {
+  // 1b. Partidos recientes ya con resultado (últimas 48h) — re-verificación silenciosa.
+  //     Corrige marcadores incorrectamente grabados (cron en mitad del partido, dato
+  //     temporal de la API, etc.) sin re-enviar notificaciones.
+  const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const { data: recentMatches } = await supabase
+    .from('matches')
+    .select('id, api_id, pool_id')
+    .not('home_score', 'is', null)
+    .not('api_id', 'is', null)
+    .gt('utc_date', cutoff48h)
+    .lt('utc_date', new Date().toISOString());
+
+  // IDs de partidos en re-verificación: no disparan notificación aunque cambien
+  const reverifyIds = new Set((recentMatches ?? []).map((m: any) => m.id as string));
+
+  const allMatches = [...(unsyncedMatches ?? []), ...(recentMatches ?? [])];
+
+  if (allMatches.length === 0) {
     return new Response(JSON.stringify({ updated: 0, total: 0 }), {
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
   // 2. Obtener el tipo (código de competición) de cada polla afectada
-  const uniquePoolIds = [...new Set(unsyncedMatches.map((m: any) => m.pool_id))];
+  const uniquePoolIds = [...new Set(allMatches.map((m: any) => m.pool_id))];
   const { data: pools } = await supabase
     .from('pools')
     .select('id, type')
@@ -82,7 +99,7 @@ serve(async () => {
   const competitionApiIds = new Map<string, Set<number>>();
   const matchesByApiId    = new Map<number, { id: string; pool_id: string }[]>();
 
-  for (const m of unsyncedMatches) {
+  for (const m of allMatches) {
     const compCode = poolTypeMap.get(m.pool_id);
     if (!compCode) continue;
 
@@ -90,7 +107,11 @@ serve(async () => {
     competitionApiIds.get(compCode)!.add(m.api_id);
 
     if (!matchesByApiId.has(m.api_id)) matchesByApiId.set(m.api_id, []);
-    matchesByApiId.get(m.api_id)!.push({ id: m.id, pool_id: m.pool_id });
+    // Evitar duplicados si el mismo match apareció en ambas listas
+    const existing = matchesByApiId.get(m.api_id)!;
+    if (!existing.some((e) => e.id === m.id)) {
+      existing.push({ id: m.id, pool_id: m.pool_id });
+    }
   }
 
   const FOOTBALL_DATA_KEY = Deno.env.get('FOOTBALL_DATA_KEY')!;
@@ -121,21 +142,33 @@ serve(async () => {
         const awayScore = apiMatch.score?.fullTime?.away;
         if (homeScore == null || awayScore == null) continue;
 
-        // Actualiza TODAS las filas con este api_id (una por cada polla que lo tiene)
-        const { error: updateError } = await supabase
-          .from('matches')
-          .update({
-            home_score: String(homeScore),
-            away_score: String(awayScore),
-          })
-          .eq('api_id', apiMatch.id)
-          .is('home_score', null);
+        const affected = matchesByApiId.get(apiMatch.id) ?? [];
 
-        if (!updateError) {
-          updated++;
-          const affected = matchesByApiId.get(apiMatch.id) ?? [];
-          for (const { pool_id } of affected) {
-            updatedPoolIds.add(pool_id);
+        // Partidos nuevos (home_score IS NULL): actualización normal
+        const newAffected      = affected.filter(({ id }) => !reverifyIds.has(id));
+        // Partidos en re-verificación: sobreescribir aunque ya tengan marcador
+        const reverifyAffected = affected.filter(({ id }) => reverifyIds.has(id));
+
+        if (newAffected.length > 0) {
+          const { error: updateError } = await supabase
+            .from('matches')
+            .update({ home_score: String(homeScore), away_score: String(awayScore) })
+            .eq('api_id', apiMatch.id)
+            .is('home_score', null);
+
+          if (!updateError) {
+            updated++;
+            for (const { pool_id } of newAffected) updatedPoolIds.add(pool_id);
+          }
+        }
+
+        // Corrección silenciosa de marcadores recientes incorrectos (sin notificación)
+        if (reverifyAffected.length > 0) {
+          for (const { id } of reverifyAffected) {
+            await supabase
+              .from('matches')
+              .update({ home_score: String(homeScore), away_score: String(awayScore) })
+              .eq('id', id);
           }
         }
       }
@@ -234,29 +267,22 @@ serve(async () => {
         }
       }
 
-      // Participantes con sus onesignal IDs
+      // Participantes de la polla
       const { data: participants } = await supabase
         .from('pool_participants')
-        .select('user_id, profiles(onesignal_player_id)')
+        .select('user_id')
         .eq('pool_id', poolId);
 
       if (tournamentJustFinished) {
         // Notificación personalizada al terminar el torneo
         const RANK_EMOJIS = ['🥇', '🥈', '🥉'];
 
-        // Construir ranking completo (incluye participantes sin predicciones → 0 pts)
         const ranking = (participants ?? [])
-          .map((p: any) => ({
-            userId:   p.user_id,
-            playerId: p.profiles?.onesignal_player_id as string | undefined,
-            points:   statsByUser.get(p.user_id) ?? 0,
-          }))
+          .map((p: any) => ({ userId: p.user_id as string, points: statsByUser.get(p.user_id) ?? 0 }))
           .sort((a, b) => b.points - a.points);
 
         for (let i = 0; i < ranking.length; i++) {
-          const { playerId, points } = ranking[i];
-          if (!playerId) continue;
-
+          const { userId, points } = ranking[i];
           const rank  = i + 1;
           const emoji = RANK_EMOJIS[i] ?? '🏆';
           const title   = rank === 1 ? `${emoji} ¡Ganaste la polla!` : `${emoji} Polla finalizada`;
@@ -265,21 +291,19 @@ serve(async () => {
             : `Quedaste ${rank}° en "${pool.name}" con ${points} pts`;
 
           await sendPushNotification(
-            [playerId],
+            [userId],
             title,
             message,
-            { type: 'tournament_end', pool_id: poolId, rank, points },
+            { type: 'tournament_end', pool_id: poolId, rank: String(rank), points: String(points) },
           );
         }
       } else {
         // Notificación genérica de nuevos resultados
-        const playerIds = (participants ?? [])
-          .map((p: any) => p.profiles?.onesignal_player_id)
-          .filter(Boolean);
+        const userIds = (participants ?? []).map((p: any) => p.user_id as string);
 
-        if (playerIds.length > 0) {
+        if (userIds.length > 0) {
           await sendPushNotification(
-            playerIds,
+            userIds,
             'Resultado disponible',
             `Nuevos resultados en "${pool.name}" — ¡revisa tu clasificación!`,
             { type: 'result', pool_id: poolId },
