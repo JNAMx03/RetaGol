@@ -7,11 +7,13 @@ import {
   RefreshControl,
   TouchableOpacity,
 } from 'react-native';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp, Match } from '../../../context/AppContext';
 import { supabase } from '../../../services/supabase';
 import { getMatchBreakdown, getMaxMatchPoints, getBadgeColor, getMatchPoints } from '../../../utils/scoring';
 import { getTeamName } from '../../../utils/teamNames';
+import { captureRef } from 'react-native-view-shot';
+import { shareAsync, isAvailableAsync } from 'expo-sharing';
 
 const SYNC_FUNCTION_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/sync-results`;
 
@@ -36,7 +38,6 @@ interface DaySection {
 
 function getDateKey(match: Match): string {
   if (match.utcDate) {
-    // Fecha LOCAL del dispositivo para agrupar correctamente (evita desfase UTC)
     const d = new Date(match.utcDate);
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -76,6 +77,36 @@ export default function ResultsScreen({ route }: any) {
   // Dos niveles de acordeón: secciones de fecha (finalizados) y partidos expandidos
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [expandedMatches, setExpandedMatches] = useState<Set<string>>(new Set());
+
+  // ── Compartir partido ──────────────────────────────────────────────────────
+  const [shareData, setShareData] = useState<{ match: Match; preds: ParticipantPred[] } | null>(null);
+  const [sharingMatchId, setSharingMatchId] = useState<string | null>(null);
+  const shareMatchCardRef = useRef<View>(null);
+
+  useEffect(() => {
+    if (!shareData) return;
+    const timer = setTimeout(async () => {
+      try {
+        if (!shareMatchCardRef.current) return;
+        const uri = await captureRef(shareMatchCardRef, { format: 'png', quality: 0.95 });
+        if (await isAvailableAsync()) {
+          await shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Compartir resultado' });
+        }
+      } catch (e) {
+        console.log('Error compartiendo:', e);
+      } finally {
+        setSharingMatchId(null);
+        setShareData(null);
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [shareData]);
+
+  const handleShareMatch = (match: Match, preds: ParticipantPred[]) => {
+    if (sharingMatchId) return;
+    setSharingMatchId(match.id);
+    setShareData({ match, preds });
+  };
 
   // ── Carga de datos ─────────────────────────────────────────────────────────
 
@@ -243,6 +274,7 @@ export default function ResultsScreen({ route }: any) {
   const renderParticipants = (match: Match, isFinished: boolean) => {
     const preds = participantPreds[match.id];
     const isLoadingThis = loadingPreds.has(match.id);
+    const isSharingThis = sharingMatchId === match.id;
 
     if (isLoadingThis) {
       return (
@@ -302,6 +334,20 @@ export default function ResultsScreen({ route }: any) {
             </View>
           );
         })}
+
+        {/* Botón compartir — solo para partidos finalizados */}
+        {isFinished && (
+          <TouchableOpacity
+            style={[styles.shareMatchBtn, isSharingThis && styles.shareMatchBtnDisabled]}
+            onPress={() => handleShareMatch(match, preds)}
+            disabled={!!sharingMatchId}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.shareMatchBtnText}>
+              {isSharingThis ? 'Generando imagen...' : '📤  Compartir este resultado'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -381,78 +427,129 @@ export default function ResultsScreen({ route }: any) {
   }
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scroll}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#149435']} />}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* ── Sección: En curso ─────────────────────────────────────────────── */}
-      {inProgressMatches.length > 0 && (
-        <View style={styles.groupBlock}>
-          <View style={styles.groupHeader}>
-            <View style={styles.liveIndicator} />
-            <Text style={styles.groupTitle}>En curso</Text>
-            <Text style={styles.groupCount}>{inProgressMatches.length}</Text>
+    <View style={styles.root}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scroll}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#149435']} />}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Sección: En curso ─────────────────────────────────────────────── */}
+        {inProgressMatches.length > 0 && (
+          <View style={styles.groupBlock}>
+            <View style={styles.groupHeader}>
+              <View style={styles.liveIndicator} />
+              <Text style={styles.groupTitle}>En curso</Text>
+              <Text style={styles.groupCount}>{inProgressMatches.length}</Text>
+            </View>
+            <View style={styles.groupBody}>
+              {inProgressMatches.map((match, idx) =>
+                renderMatchCard(match, idx === inProgressMatches.length - 1, false)
+              )}
+            </View>
           </View>
-          <View style={styles.groupBody}>
-            {inProgressMatches.map((match, idx) =>
-              renderMatchCard(match, idx === inProgressMatches.length - 1, false)
-            )}
+        )}
+
+        {/* ── Sección: Finalizados ──────────────────────────────────────────── */}
+        {finishedSections.length > 0 && (
+          <View style={styles.groupBlock}>
+            <View style={[styles.groupHeader, styles.groupHeaderDark]}>
+              <Text style={styles.groupHeaderDarkText}>✅  Finalizados</Text>
+              <Text style={[styles.groupCount, styles.groupCountDark]}>{finishedMatches.length}</Text>
+            </View>
+
+            {finishedSections.map((section) => {
+              const isOpen = openSections.has(section.key);
+              return (
+                <View key={section.key} style={styles.sectionBlock}>
+                  {/* Cabecera de jornada */}
+                  <TouchableOpacity
+                    style={[styles.sectionHeader, isOpen && styles.sectionHeaderOpen]}
+                    onPress={() => toggleSection(section.key)}
+                    activeOpacity={0.75}
+                  >
+                    <View>
+                      <Text style={styles.sectionTitle}>{section.title}</Text>
+                      <Text style={styles.sectionSub}>
+                        {section.totalCount} partido{section.totalCount !== 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                    <View style={styles.sectionRight}>
+                      {section.totalPts > 0 && (
+                        <View style={styles.sectionPtsBadge}>
+                          <Text style={styles.sectionPtsBadgeText}>+{section.totalPts} pts</Text>
+                        </View>
+                      )}
+                      <Text style={styles.chevron}>{isOpen ? '▲' : '▼'}</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Partidos de la jornada */}
+                  {isOpen && section.data.map((match, idx) =>
+                    renderMatchCard(match, idx === section.data.length - 1, true)
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
+
+      {/* ── Tarjeta off-screen para compartir partido ──────────────────────── */}
+      {shareData && (
+        <View
+          ref={shareMatchCardRef}
+          collapsable={false}
+          style={styles.shareCard}
+        >
+          <View style={styles.scHeader}>
+            <Text style={styles.scPoolName} numberOfLines={1}>{pool.name}</Text>
+            <Text style={styles.scMatchResult}>
+              {getTeamName(shareData.match.home)}{'  '}
+              {shareData.match.homeScore} – {shareData.match.awayScore}
+              {'  '}{getTeamName(shareData.match.away)}
+            </Text>
+            <Text style={styles.scMatchDate}>{shareData.match.date}</Text>
+          </View>
+          <View style={styles.scBody}>
+            {shareData.preds.map((p) => {
+              const isMe = p.userId === user?.id;
+              const hasPred = p.homeScore !== '' && p.awayScore !== '';
+              const pts = hasPred
+                ? getMatchPoints(
+                    { homeScore: p.homeScore, awayScore: p.awayScore },
+                    { homeScore: shareData.match.homeScore, awayScore: shareData.match.awayScore },
+                    pool.scoringConfig,
+                    shareData.match.stage,
+                  )
+                : null;
+              const badgeColor = pts !== null ? getBadgeColor(pts, maxPts) : '#CBD5E1';
+              return (
+                <View key={p.userId} style={styles.scRow}>
+                  <Text style={[styles.scName, isMe && styles.scNameMe]} numberOfLines={1}>
+                    {isMe ? `⭐ ${p.name}` : p.name}
+                  </Text>
+                  <Text style={styles.scPred}>{hasPred ? `${p.homeScore} – ${p.awayScore}` : '–'}</Text>
+                  <View style={[styles.scBadge, { backgroundColor: badgeColor }]}>
+                    <Text style={styles.scBadgePts}>{pts !== null ? `${pts} pts` : '–'}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+          <View style={styles.scFooter}>
+            <Text style={styles.scFooterText}>Prolla · prolla.app</Text>
           </View>
         </View>
       )}
-
-      {/* ── Sección: Finalizados ──────────────────────────────────────────── */}
-      {finishedSections.length > 0 && (
-        <View style={styles.groupBlock}>
-          <View style={[styles.groupHeader, styles.groupHeaderDark]}>
-            <Text style={styles.groupHeaderDarkText}>✅  Finalizados</Text>
-            <Text style={[styles.groupCount, styles.groupCountDark]}>{finishedMatches.length}</Text>
-          </View>
-
-          {finishedSections.map((section) => {
-            const isOpen = openSections.has(section.key);
-            return (
-              <View key={section.key} style={styles.sectionBlock}>
-                {/* Cabecera de jornada */}
-                <TouchableOpacity
-                  style={[styles.sectionHeader, isOpen && styles.sectionHeaderOpen]}
-                  onPress={() => toggleSection(section.key)}
-                  activeOpacity={0.75}
-                >
-                  <View>
-                    <Text style={styles.sectionTitle}>{section.title}</Text>
-                    <Text style={styles.sectionSub}>
-                      {section.totalCount} partido{section.totalCount !== 1 ? 's' : ''}
-                    </Text>
-                  </View>
-                  <View style={styles.sectionRight}>
-                    {section.totalPts > 0 && (
-                      <View style={styles.sectionPtsBadge}>
-                        <Text style={styles.sectionPtsBadgeText}>+{section.totalPts} pts</Text>
-                      </View>
-                    )}
-                    <Text style={styles.chevron}>{isOpen ? '▲' : '▼'}</Text>
-                  </View>
-                </TouchableOpacity>
-
-                {/* Partidos de la jornada */}
-                {isOpen && section.data.map((match, idx) =>
-                  renderMatchCard(match, idx === section.data.length - 1, true)
-                )}
-              </View>
-            );
-          })}
-        </View>
-      )}
-    </ScrollView>
+    </View>
   );
 }
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#F4EBD8' },
   container: { flex: 1, backgroundColor: '#F4EBD8' },
   scroll: { padding: 12, paddingBottom: 32 },
   center: {
@@ -580,4 +677,38 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF9C3', borderWidth: 1, borderColor: '#FDE68A',
   },
   participantBadgeEmptyText: { fontSize: 11, fontWeight: '600', color: '#92400E' },
+
+  // ── Botón compartir partido ─────────────────────────────────────────────────
+  shareMatchBtn: {
+    marginTop: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    backgroundColor: '#F0FDF4', borderRadius: 8, paddingVertical: 9,
+    borderWidth: 1.5, borderColor: '#86EFAC',
+  },
+  shareMatchBtnDisabled: { opacity: 0.5 },
+  shareMatchBtnText: { color: '#149435', fontWeight: '700', fontSize: 13 },
+
+  // ── Tarjeta de compartir partido (off-screen) ───────────────────────────────
+  shareCard: {
+    position: 'absolute', left: -9999, top: 0,
+    width: 340, backgroundColor: 'white',
+    borderRadius: 16, overflow: 'hidden',
+  },
+  scHeader: {
+    backgroundColor: '#149435', paddingHorizontal: 20, paddingVertical: 16,
+  },
+  scPoolName: { fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '600', marginBottom: 6 },
+  scMatchResult: { fontSize: 17, fontWeight: '800', color: 'white', marginBottom: 4 },
+  scMatchDate: { fontSize: 12, color: 'rgba(255,255,255,0.7)' },
+  scBody: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+  scRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F4EBD8',
+  },
+  scName: { flex: 1, fontSize: 13, fontWeight: '500', color: '#374151' },
+  scNameMe: { color: '#149435', fontWeight: '700' },
+  scPred: { fontSize: 13, fontWeight: '700', color: '#0F172A', marginHorizontal: 12, minWidth: 44, textAlign: 'center' },
+  scBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, minWidth: 52, alignItems: 'center' },
+  scBadgePts: { color: 'white', fontWeight: '700', fontSize: 12 },
+  scFooter: { backgroundColor: '#F4EBD8', paddingVertical: 10, alignItems: 'center' },
+  scFooterText: { fontSize: 12, color: '#64748B', fontWeight: '600' },
 });

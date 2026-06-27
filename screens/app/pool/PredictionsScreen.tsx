@@ -11,14 +11,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { useApp, Match } from '../../../context/AppContext';
 import { supabase } from '../../../services/supabase';
 import { getTeamName } from '../../../utils/teamNames';
+import { getMatchPoints } from '../../../utils/scoring';
 
 // ─── Helpers de fecha ─────────────────────────────────────────────────────────
 
 function getDateKey(match: Match): string {
   if (match.utcDate) {
-    // Convertir a fecha LOCAL del dispositivo para agrupar correctamente.
-    // Un partido a las 9PM Colombia (UTC-5) es UTC+1 día → sin esta conversión
-    // quedaría en la sección del día siguiente.
     const d = new Date(match.utcDate);
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -31,9 +29,8 @@ function getDateKey(match: Match): string {
 function formatSectionTitle(key: string): string {
   try {
     const [year, month, day] = key.split('-').map(Number);
-    const d = new Date(year, month - 1, day); // fecha local (evita desfase UTC)
+    const d = new Date(year, month - 1, day);
     const str = d.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
-    // Solo capitalizar la primera letra; el resto en minúscula natural ("viernes, 12 de junio")
     return str.charAt(0).toUpperCase() + str.slice(1);
   } catch { return key; }
 }
@@ -84,10 +81,24 @@ function MatchItem({
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
 interface DaySection {
-  key: string;    // YYYY-MM-DD
-  title: string;  // "sábado, 11 de junio"
+  key: string;
+  title: string;
   data: Match[];
 }
+
+interface PodiumParticipant {
+  userId: string;
+  name: string;
+  points: number;
+}
+
+interface TeamPodium {
+  champion: string;
+  runnerUp: string;
+  thirdPlace: string | null;
+}
+
+const RANK_MEDALS = ['🥇', '🥈', '🥉'];
 
 // ─── Pantalla ─────────────────────────────────────────────────────────────────
 
@@ -103,8 +114,15 @@ export default function PredictionsScreen({ route }: any) {
   // Resultados frescos desde Supabase (utc_date + home_score actualizados)
   const [freshResults, setFreshResults] = useState<Record<string, { homeScore: string; awayScore: string; utcDate?: string }>>({});
 
+  // ── Podio (solo cuando el torneo termina) ──────────────────────────────────
+  const [podiumParticipants, setPodiumParticipants] = useState<PodiumParticipant[]>([]);
+  const [teamPodium, setTeamPodium] = useState<TeamPodium | null>(null);
+  const [myChampionPicks, setMyChampionPicks] = useState<{
+    champion: string | null; runnerUp: string | null; thirdPlace: string | null;
+  } | null>(null);
+  const [loadingPodium, setLoadingPodium] = useState(false);
+
   // IDs de partidos bloqueados: ya tienen resultado O ya empezaron (utcDate <= ahora)
-  // Usa freshResults para no depender del estado stale de pool.matches
   const lockedIds = useMemo(() => {
     const now = new Date();
     return new Set(
@@ -122,20 +140,23 @@ export default function PredictionsScreen({ route }: any) {
     );
   }, [pool.matches, freshResults]);
 
-  // Solo partidos con resultado real (para el banner informativo)
   const finishedCount = useMemo(
     () => Object.values(freshResults).filter((r) => r.homeScore !== '' && r.awayScore !== '').length,
     [freshResults],
   );
 
-  // Partidos iniciados pero sin resultado aún (en curso)
   const inProgressCount = lockedIds.size - finishedCount;
+
+  // El torneo terminó cuando TODOS los partidos tienen resultado (ninguno en curso ni pendiente)
+  const tournamentFinished = useMemo(() => {
+    const total = Object.keys(freshResults).length;
+    return !loadingPreds && total > 0 && finishedCount === total;
+  }, [loadingPreds, finishedCount, freshResults]);
 
   // Cargar estado fresco de partidos + predicciones del usuario desde Supabase
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Resultados y fechas frescos (para saber si el partido ya inició)
         const { data: freshMatches } = await supabase
           .from('matches')
           .select('id, home_score, away_score, utc_date')
@@ -153,7 +174,6 @@ export default function PredictionsScreen({ route }: any) {
           setFreshResults(map);
         }
 
-        // Predicciones guardadas del usuario
         const { data: preds } = await supabase
           .from('predictions')
           .select('match_id, home_score, away_score')
@@ -181,6 +201,97 @@ export default function PredictionsScreen({ route }: any) {
     fetchData();
   }, []);
 
+  // Cargar datos del podio cuando el torneo termina
+  useEffect(() => {
+    if (!tournamentFinished) return;
+
+    // Podio de equipos — derivado de los partidos locales + freshResults (sin fetch extra)
+    const finalMatch = (pool.matches as Match[]).find((m) => m.stage === 'FINAL');
+    const thirdMatch = (pool.matches as Match[]).find(
+      (m) => m.stage === 'THIRD_PLACE' || m.stage === 'THIRD_PLACE_MATCH',
+    );
+
+    if (finalMatch) {
+      const r = freshResults[finalMatch.id];
+      if (r && r.homeScore !== '' && r.awayScore !== '') {
+        const h = parseInt(r.homeScore);
+        const a = parseInt(r.awayScore);
+        // Si hubo penales (empate en el tiempo reglamentario) no podemos determinar el ganador
+        if (h !== a) {
+          const champion = h > a ? finalMatch.home : finalMatch.away;
+          const runnerUp  = h > a ? finalMatch.away : finalMatch.home;
+          let thirdPlace: string | null = null;
+          if (thirdMatch) {
+            const r3 = freshResults[thirdMatch.id];
+            if (r3 && r3.homeScore !== '' && r3.awayScore !== '') {
+              const h3 = parseInt(r3.homeScore);
+              const a3 = parseInt(r3.awayScore);
+              if (h3 !== a3) thirdPlace = h3 > a3 ? thirdMatch.home : thirdMatch.away;
+            }
+          }
+          setTeamPodium({ champion, runnerUp, thirdPlace });
+        }
+      }
+    }
+
+    // Clasificación de participantes + picks del campeón
+    const fetchPodiumData = async () => {
+      setLoadingPodium(true);
+      try {
+        const [
+          { data: participants },
+          { data: allPreds },
+          champResult,
+        ] = await Promise.all([
+          supabase.from('pool_participants').select('user_id, profiles(name)').eq('pool_id', pool.id),
+          supabase.from('predictions').select('user_id, match_id, home_score, away_score').eq('pool_id', pool.id),
+          pool.championConfig?.enabled
+            ? supabase.from('pool_champion_predictions')
+                .select('champion, runner_up, third_place')
+                .eq('pool_id', pool.id)
+                .eq('user_id', user?.id ?? '')
+                .maybeSingle()
+            : Promise.resolve({ data: null }),
+        ]);
+
+        // Calcular puntos por participante
+        const calculated: PodiumParticipant[] = (participants ?? []).map((p: any) => {
+          const userPreds = (allPreds ?? []).filter((pr: any) => pr.user_id === p.user_id);
+          let points = 0;
+          for (const match of pool.matches as Match[]) {
+            const result = freshResults[match.id];
+            if (!result || result.homeScore === '' || result.awayScore === '') continue;
+            const pred = userPreds.find((pr: any) => pr.match_id === match.id);
+            if (!pred) continue;
+            points += getMatchPoints(
+              { homeScore: String(pred.home_score), awayScore: String(pred.away_score) },
+              result,
+              pool.scoringConfig,
+              match.stage,
+            );
+          }
+          return { userId: p.user_id, name: p.profiles?.name ?? 'Usuario', points };
+        });
+
+        setPodiumParticipants(calculated.sort((a, b) => b.points - a.points));
+
+        if (champResult.data) {
+          setMyChampionPicks({
+            champion:   champResult.data.champion   ?? null,
+            runnerUp:   champResult.data.runner_up  ?? null,
+            thirdPlace: champResult.data.third_place ?? null,
+          });
+        }
+      } catch (e) {
+        console.log('Error cargando podio:', e);
+      } finally {
+        setLoadingPodium(false);
+      }
+    };
+
+    fetchPodiumData();
+  }, [tournamentFinished]);
+
   const handleChange = (id: string, field: string, value: string) => {
     setMatches((prev) => prev.map((m) => (m.id === id ? { ...m, [field]: value } : m)));
   };
@@ -201,7 +312,6 @@ export default function PredictionsScreen({ route }: any) {
     }
   };
 
-  // Solo partidos no bloqueados (sin resultado Y que aún no han empezado)
   const pendingMatches = useMemo(
     () => matches.filter((m) => !lockedIds.has(m.id)),
     [matches, lockedIds],
@@ -219,8 +329,6 @@ export default function PredictionsScreen({ route }: any) {
       .map(([key, data]) => ({ key, title: formatSectionTitle(key), data }));
   }, [pendingMatches]);
 
-  // Las secciones empiezan cerradas — el usuario las abre según necesite
-
   const toggleSection = (key: string) => {
     setOpenSections((prev) => {
       const next = new Set(prev);
@@ -235,6 +343,94 @@ export default function PredictionsScreen({ route }: any) {
   if (loadingPreds) {
     return <View style={styles.center}><ActivityIndicator size="large" color="#149435" /></View>;
   }
+
+  // ── Pantalla de podio al terminar el torneo ────────────────────────────────
+
+  if (tournamentFinished && pendingMatches.length === 0) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.podiumScroll}>
+        {/* Header festivo */}
+        <View style={styles.podiumHeader}>
+          <Text style={styles.podiumHeaderEmoji}>🏆</Text>
+          <Text style={styles.podiumHeaderTitle}>¡Torneo finalizado!</Text>
+          <Text style={styles.podiumHeaderSub}>{pool.name}</Text>
+        </View>
+
+        {loadingPodium ? (
+          <ActivityIndicator color="#149435" size="large" style={{ marginTop: 32 }} />
+        ) : (
+          <View style={styles.podiumContent}>
+
+            {/* ── Podio de equipos ───────────────────────────────────── */}
+            {teamPodium && (
+              <View style={styles.podiumCard}>
+                <Text style={styles.podiumCardTitle}>Resultado del torneo</Text>
+                {[
+                  {
+                    emoji: '🥇', label: 'Campeón',    team: teamPodium.champion,
+                    pick: pool.championConfig?.enabled ? myChampionPicks?.champion ?? null : null,
+                  },
+                  {
+                    emoji: '🥈', label: 'Subcampeón', team: teamPodium.runnerUp,
+                    pick: pool.championConfig?.enabled ? myChampionPicks?.runnerUp ?? null : null,
+                  },
+                  ...(teamPodium.thirdPlace ? [{
+                    emoji: '🥉', label: '3er lugar',  team: teamPodium.thirdPlace,
+                    pick: pool.championConfig?.enabled ? myChampionPicks?.thirdPlace ?? null : null,
+                  }] : []),
+                ].map(({ emoji, label, team, pick }) => {
+                  const hit  = pick != null && pick === team;
+                  const miss = pick != null && pick !== team;
+                  return (
+                    <View key={label} style={styles.teamRow}>
+                      <Text style={styles.teamRowEmoji}>{emoji}</Text>
+                      <View style={styles.teamRowInfo}>
+                        <Text style={styles.teamRowLabel}>{label}</Text>
+                        <Text style={styles.teamRowName}>{getTeamName(team)}</Text>
+                      </View>
+                      {pick != null && (
+                        <View style={[styles.pickBadge, hit ? styles.pickHit : styles.pickMiss]}>
+                          <Text style={[styles.pickBadgeText, hit ? styles.pickHitText : styles.pickMissText]}>
+                            {hit ? '✅ Acertaste' : `❌ ${getTeamName(pick)}`}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* ── Clasificación final ────────────────────────────────── */}
+            {podiumParticipants.length > 0 && (
+              <View style={styles.podiumCard}>
+                <Text style={styles.podiumCardTitle}>Clasificación final</Text>
+                {podiumParticipants.map((p, index) => {
+                  const isMe = p.userId === user?.id;
+                  return (
+                    <View key={p.userId} style={[styles.rankRow, isMe && styles.rankRowMe]}>
+                      <Text style={styles.rankMedal}>
+                        {RANK_MEDALS[index] ?? `${index + 1}`}
+                      </Text>
+                      <Text style={[styles.rankName, isMe && styles.rankNameMe]} numberOfLines={1}>
+                        {p.name}
+                      </Text>
+                      <Text style={[styles.rankPts, isMe && styles.rankPtsMe]}>
+                        {p.points} pts
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+          </View>
+        )}
+      </ScrollView>
+    );
+  }
+
+  // ── Estado vacío (partidos en curso, sin pendientes) ──────────────────────
 
   if (pendingMatches.length === 0) {
     return (
@@ -253,6 +449,8 @@ export default function PredictionsScreen({ route }: any) {
     );
   }
 
+  // ── Lista de predicciones pendientes ──────────────────────────────────────
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -270,8 +468,6 @@ export default function PredictionsScreen({ route }: any) {
 
           return (
             <View key={section.key} style={styles.sectionBlock}>
-
-              {/* ── Cabecera de jornada ──────────────────────────── */}
               <TouchableOpacity
                 style={[styles.sectionHeader, isOpen && styles.sectionHeaderOpen]}
                 onPress={() => toggleSection(section.key)}
@@ -299,7 +495,6 @@ export default function PredictionsScreen({ route }: any) {
                 </View>
               </TouchableOpacity>
 
-              {/* ── Partidos del día ─────────────────────────────── */}
               {isOpen && section.data.map((match, idx) => (
                 <MatchItem
                   key={match.id}
@@ -308,12 +503,10 @@ export default function PredictionsScreen({ route }: any) {
                   isLast={idx === section.data.length - 1}
                 />
               ))}
-
             </View>
           );
         })}
 
-        {/* Banner de partidos bloqueados */}
         {lockedIds.size > 0 && (
           <View style={styles.finishedBanner}>
             <Text>🔒</Text>
@@ -327,7 +520,6 @@ export default function PredictionsScreen({ route }: any) {
         )}
       </ScrollView>
 
-      {/* ── Botón guardar ────────────────────────────────────────── */}
       <View style={styles.footer}>
         {savedMsg && <Text style={styles.savedMsg}>Predicciones guardadas ✓</Text>}
         <TouchableOpacity
@@ -359,30 +551,23 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 17, fontWeight: 'bold', color: '#374151', marginBottom: 8 },
   emptyText: { color: '#64748B', textAlign: 'center', fontSize: 14, lineHeight: 21 },
 
-  // ── Bloque de sección (card agrupadora con sombra) ──────────────────────────
+  // ── Secciones de predicciones ───────────────────────────────────────────────
   sectionBlock: {
     marginBottom: 14,
     borderRadius: 12,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
-
   sectionHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: '#DADADA', borderRadius: 12,
     paddingHorizontal: 16, paddingVertical: 13,
   },
-  sectionHeaderOpen: {
-    borderBottomLeftRadius: 0, borderBottomRightRadius: 0,
-  },
-  sectionTitle: {
-    fontSize: 14, fontWeight: '700', color: '#374151',
-  },
+  sectionHeaderOpen: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#374151' },
   sectionSub: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
   sectionRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   chevron: { fontSize: 12, color: '#64748B' },
-
-  // Badge de progreso X/Y
   progressBadge: {
     paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, borderWidth: 1,
   },
@@ -394,15 +579,12 @@ const styles = StyleSheet.create({
   badgeGray: { backgroundColor: 'rgba(0,0,0,0.06)', borderColor: 'rgba(0,0,0,0.15)' },
   textGray: { color: '#64748B' },
 
-  // ── Tarjeta de partido (embebida, sin sombra propia) ────────────────────────
   matchCard: {
     backgroundColor: 'white',
     paddingHorizontal: 16, paddingVertical: 13,
     borderTopWidth: 1, borderTopColor: '#F4EBD8',
   },
-  matchCardLast: {
-    borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
-  },
+  matchCardLast: { borderBottomLeftRadius: 12, borderBottomRightRadius: 12 },
   matchDate: { fontSize: 11, color: '#94A3B8', marginBottom: 10 },
   matchRow: { flexDirection: 'row', alignItems: 'center' },
   teamName: { flex: 1, fontWeight: '600', color: '#0F172A', fontSize: 13 },
@@ -415,7 +597,6 @@ const styles = StyleSheet.create({
   },
   vs: { fontWeight: 'bold', marginHorizontal: 6, color: '#64748B', fontSize: 18 },
 
-  // Banner de partidos finalizados
   finishedBanner: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#FAF7F2', borderRadius: 10, padding: 12,
@@ -423,7 +604,6 @@ const styles = StyleSheet.create({
   },
   finishedText: { fontSize: 13, color: '#64748B', flex: 1 },
 
-  // Footer con botón guardar
   footer: {
     padding: 16, backgroundColor: 'white',
     borderTopWidth: 1, borderTopColor: '#DADADA',
@@ -432,4 +612,55 @@ const styles = StyleSheet.create({
   btn: { backgroundColor: '#149435', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: 'white', fontWeight: 'bold', fontSize: 15 },
+
+  // ── Podio ───────────────────────────────────────────────────────────────────
+  podiumScroll: { padding: 16, paddingBottom: 32 },
+  podiumHeader: {
+    backgroundColor: '#149435', borderRadius: 16,
+    alignItems: 'center', paddingVertical: 28, marginBottom: 16,
+  },
+  podiumHeaderEmoji: { fontSize: 52, marginBottom: 10 },
+  podiumHeaderTitle: { fontSize: 22, fontWeight: '800', color: 'white', marginBottom: 4 },
+  podiumHeaderSub: { fontSize: 15, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
+  podiumContent: { gap: 12 },
+  podiumCard: {
+    backgroundColor: 'white', borderRadius: 14, padding: 16,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 }, elevation: 2,
+  },
+  podiumCardTitle: {
+    fontSize: 11, fontWeight: '700', color: '#94A3B8',
+    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 14,
+  },
+
+  // Fila de equipo (campeón, subcampeón, 3°)
+  teamRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F4EBD8',
+  },
+  teamRowEmoji: { fontSize: 28, width: 44 },
+  teamRowInfo: { flex: 1 },
+  teamRowLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '600', marginBottom: 2 },
+  teamRowName: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
+  pickBadge: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 },
+  pickHit: { backgroundColor: '#F0FDF4' },
+  pickMiss: { backgroundColor: '#FEF2F2' },
+  pickBadgeText: { fontSize: 12, fontWeight: '600' },
+  pickHitText: { color: '#149435' },
+  pickMissText: { color: '#DC2626' },
+
+  // Fila de participante en la clasificación
+  rankRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F4EBD8',
+  },
+  rankRowMe: {
+    backgroundColor: '#F0FDF4', borderRadius: 8,
+    paddingHorizontal: 8, marginHorizontal: -8,
+  },
+  rankMedal: { fontSize: 22, width: 40, textAlign: 'center' },
+  rankName: { flex: 1, fontSize: 15, fontWeight: '500', color: '#0F172A' },
+  rankNameMe: { color: '#149435', fontWeight: '700' },
+  rankPts: { fontSize: 15, fontWeight: '700', color: '#374151' },
+  rankPtsMe: { color: '#149435' },
 });

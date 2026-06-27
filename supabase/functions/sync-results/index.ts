@@ -98,7 +98,6 @@ serve(async () => {
   const updatedPoolIds = new Set<string>();
 
   // 4. UNA sola llamada API por competición (en vez de una por partido)
-  //    Ejemplo: WC tiene 64 partidos → antes: 64 llamadas, ahora: 1 llamada
   for (const [compCode, apiIds] of competitionApiIds) {
     try {
       const res = await fetch(
@@ -149,29 +148,12 @@ serve(async () => {
 
   for (const poolId of updatedPoolIds) {
     try {
-      const { data: participants } = await supabase
-        .from('pool_participants')
-        .select('profiles(onesignal_player_id)')
-        .eq('pool_id', poolId);
-
-      const playerIds = (participants ?? [])
-        .map((p: any) => p.profiles?.onesignal_player_id)
-        .filter(Boolean);
-
+      // Info de la polla
       const { data: pool } = await supabase
         .from('pools')
         .select('name, type, scoring_config')
         .eq('id', poolId)
         .single();
-
-      if (playerIds.length > 0) {
-        await sendPushNotification(
-          playerIds,
-          'Resultado disponible',
-          `Nuevos resultados en "${pool?.name ?? 'tu polla'}" — ¡revisa tu clasificación!`,
-          { type: 'result', pool_id: poolId },
-        );
-      }
 
       if (!pool) continue;
 
@@ -185,6 +167,16 @@ serve(async () => {
 
       if (!finishedMatches || finishedMatches.length === 0) continue;
 
+      // Total de partidos en la polla (para detectar si el torneo terminó)
+      const { count: totalMatchCount } = await supabase
+        .from('matches')
+        .select('*', { count: 'exact', head: true })
+        .eq('pool_id', poolId);
+
+      const tournamentJustFinished =
+        (totalMatchCount ?? 0) > 0 && finishedMatches.length === totalMatchCount;
+
+      // Construir mapa de resultados para cálculo de puntos
       const resultMap = new Map(
         finishedMatches.map((m: any) => [
           m.id,
@@ -192,53 +184,110 @@ serve(async () => {
         ]),
       );
 
+      // Calcular puntos por usuario
       const { data: allPredictions } = await supabase
         .from('predictions')
         .select('user_id, match_id, home_score, away_score')
         .eq('pool_id', poolId);
 
-      if (!allPredictions || allPredictions.length === 0) continue;
-
-      const byUser = new Map<string, typeof allPredictions>();
-      for (const pred of allPredictions) {
-        if (!byUser.has(pred.user_id)) byUser.set(pred.user_id, []);
-        byUser.get(pred.user_id)!.push(pred);
-      }
-
       const config: ScoringConfig = pool.scoring_config ?? {};
       const statsRows: object[] = [];
+      const statsByUser = new Map<string, number>();
 
-      for (const [userId, preds] of byUser) {
-        let totalPoints      = 0;
-        let totalCorrect     = 0;
-        let totalExact       = 0;
-        const totalPredictions = preds.length;
-
-        for (const pred of preds) {
-          const result = resultMap.get(pred.match_id);
-          if (!result) continue;
-
-          const pts = calcPoints(pred, result, config);
-          const isExact = pred.home_score === result.homeScore
-                       && pred.away_score === result.awayScore;
-
-          if (pts > 0) totalCorrect++;
-          if (isExact) totalExact++;
-          totalPoints += pts;
+      if (allPredictions && allPredictions.length > 0) {
+        const byUser = new Map<string, typeof allPredictions>();
+        for (const pred of allPredictions) {
+          if (!byUser.has(pred.user_id)) byUser.set(pred.user_id, []);
+          byUser.get(pred.user_id)!.push(pred);
         }
 
-        statsRows.push({
-          user_id:           userId,
-          pool_id:           poolId,
-          pool_name:         pool.name,
-          tournament_type:   pool.type ?? '',
-          total_points:      totalPoints,
-          total_predictions: totalPredictions,
-          total_correct:     totalCorrect,
-          total_exact:       totalExact,
-        });
+        for (const [userId, preds] of byUser) {
+          let totalPoints      = 0;
+          let totalCorrect     = 0;
+          let totalExact       = 0;
+          const totalPredictions = preds.length;
+
+          for (const pred of preds) {
+            const result = resultMap.get(pred.match_id);
+            if (!result) continue;
+
+            const pts = calcPoints(pred, result, config);
+            const isExact = pred.home_score === result.homeScore
+                         && pred.away_score === result.awayScore;
+
+            if (pts > 0) totalCorrect++;
+            if (isExact) totalExact++;
+            totalPoints += pts;
+          }
+
+          statsByUser.set(userId, totalPoints);
+          statsRows.push({
+            user_id:           userId,
+            pool_id:           poolId,
+            pool_name:         pool.name,
+            tournament_type:   pool.type ?? '',
+            total_points:      totalPoints,
+            total_predictions: totalPredictions,
+            total_correct:     totalCorrect,
+            total_exact:       totalExact,
+          });
+        }
       }
 
+      // Participantes con sus onesignal IDs
+      const { data: participants } = await supabase
+        .from('pool_participants')
+        .select('user_id, profiles(onesignal_player_id)')
+        .eq('pool_id', poolId);
+
+      if (tournamentJustFinished) {
+        // Notificación personalizada al terminar el torneo
+        const RANK_EMOJIS = ['🥇', '🥈', '🥉'];
+
+        // Construir ranking completo (incluye participantes sin predicciones → 0 pts)
+        const ranking = (participants ?? [])
+          .map((p: any) => ({
+            userId:   p.user_id,
+            playerId: p.profiles?.onesignal_player_id as string | undefined,
+            points:   statsByUser.get(p.user_id) ?? 0,
+          }))
+          .sort((a, b) => b.points - a.points);
+
+        for (let i = 0; i < ranking.length; i++) {
+          const { playerId, points } = ranking[i];
+          if (!playerId) continue;
+
+          const rank  = i + 1;
+          const emoji = RANK_EMOJIS[i] ?? '🏆';
+          const title   = rank === 1 ? `${emoji} ¡Ganaste la polla!` : `${emoji} Polla finalizada`;
+          const message = rank === 1
+            ? `¡Quedaste 1° en "${pool.name}" con ${points} pts! 🎉`
+            : `Quedaste ${rank}° en "${pool.name}" con ${points} pts`;
+
+          await sendPushNotification(
+            [playerId],
+            title,
+            message,
+            { type: 'tournament_end', pool_id: poolId, rank, points },
+          );
+        }
+      } else {
+        // Notificación genérica de nuevos resultados
+        const playerIds = (participants ?? [])
+          .map((p: any) => p.profiles?.onesignal_player_id)
+          .filter(Boolean);
+
+        if (playerIds.length > 0) {
+          await sendPushNotification(
+            playerIds,
+            'Resultado disponible',
+            `Nuevos resultados en "${pool.name}" — ¡revisa tu clasificación!`,
+            { type: 'result', pool_id: poolId },
+          );
+        }
+      }
+
+      // Upsert de stats
       if (statsRows.length > 0) {
         const { error: statsError } = await supabase
           .from('user_pool_stats')
