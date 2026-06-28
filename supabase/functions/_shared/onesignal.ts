@@ -9,7 +9,7 @@ export async function sendPushNotification(
 ): Promise<void> {
   if (userIds.length === 0) return;
 
-  await fetch('https://api.onesignal.com/notifications', {
+  const res = await fetch('https://api.onesignal.com/notifications', {
     method: 'POST',
     headers: {
       'Authorization': `Key ${Deno.env.get('ONESIGNAL_REST_API_KEY')!}`,
@@ -24,4 +24,6 @@ export async function sendPushNotification(
       ...(data ? { data } : {}),
     }),
   });
+  const body = await res.text();
+  console.log(`OneSignal response [${res.status}]:`, body);
 }

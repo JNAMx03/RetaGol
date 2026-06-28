@@ -35,6 +35,14 @@ function formatSectionTitle(key: string): string {
   } catch { return key; }
 }
 
+function formatMatchTime(utcDate: string): string {
+  const d = new Date(utcDate);
+  return d.toLocaleDateString('es-CO', {
+    weekday: 'short', day: 'numeric', month: 'short',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
 // ─── Tarjeta de partido embebida en sección ───────────────────────────────────
 
 function MatchItem({
@@ -48,7 +56,7 @@ function MatchItem({
 }) {
   return (
     <View style={[styles.matchCard, isLast && styles.matchCardLast]}>
-      <Text style={styles.matchDate}>{match.date}</Text>
+      <Text style={styles.matchDate}>{match.utcDate ? formatMatchTime(match.utcDate) : match.date}</Text>
       <View style={styles.matchRow}>
         <Text style={styles.teamName} numberOfLines={2}>{getTeamName(match.home)}</Text>
         <View style={styles.scoreRow}>

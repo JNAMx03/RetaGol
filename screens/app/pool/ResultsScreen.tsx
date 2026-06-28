@@ -56,6 +56,14 @@ function formatSectionTitle(key: string): string {
   } catch { return key; }
 }
 
+function formatMatchTime(utcDate: string): string {
+  const d = new Date(utcDate);
+  return d.toLocaleDateString('es-CO', {
+    weekday: 'short', day: 'numeric', month: 'short',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
 // ─── Pantalla ─────────────────────────────────────────────────────────────────
 
 export default function ResultsScreen({ route }: any) {
@@ -370,7 +378,7 @@ export default function ResultsScreen({ route }: any) {
           activeOpacity={0.75}
         >
           <View style={styles.cardHeaderLeft}>
-            <Text style={styles.cardDate}>{match.date}</Text>
+            <Text style={styles.cardDate}>{match.utcDate ? formatMatchTime(match.utcDate) : match.date}</Text>
             <Text style={styles.cardTeams}>
               {getTeamName(match.home)}
               {isFinished ? `  ${match.homeScore} – ${match.awayScore}  ` : '  vs  '}
@@ -509,7 +517,7 @@ export default function ResultsScreen({ route }: any) {
               {shareData.match.homeScore} – {shareData.match.awayScore}
               {'  '}{getTeamName(shareData.match.away)}
             </Text>
-            <Text style={styles.scMatchDate}>{shareData.match.date}</Text>
+            <Text style={styles.scMatchDate}>{shareData.match.utcDate ? formatMatchTime(shareData.match.utcDate) : shareData.match.date}</Text>
           </View>
           <View style={styles.scBody}>
             {shareData.preds.map((p) => {

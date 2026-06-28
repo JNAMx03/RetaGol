@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// Replica de formatMatchDate del cliente (locale es-CO)
+// Replica de formatMatchDate del cliente (locale es-CO, zona Colombia UTC-5)
 function formatMatchDate(utcDate: string): string {
   const date = new Date(utcDate);
   return date.toLocaleDateString('es-CO', {
@@ -19,25 +19,28 @@ serve(async () => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
-  // 1. Pollas que aún tienen partidos sin resultado (torneo en curso)
-  const { data: activeMatchRows } = await supabase
-    .from('matches')
-    .select('pool_id, pools(type)')
-    .is('home_score', null);
+  // 1. Todas las pollas que tienen tipo de competición asignado.
+  //    NO filtramos por home_score IS NULL — eso causaba que la función
+  //    saliera prematuramente al finalizar la fase de grupos (todos los
+  //    partidos existentes tenían resultado y no había nada "sin resultado"
+  //    aunque los partidos de eliminatorias aún no estuvieran en BD).
+  const { data: pools } = await supabase
+    .from('pools')
+    .select('id, type')
+    .not('type', 'is', null);
 
-  if (!activeMatchRows || activeMatchRows.length === 0) {
-    return new Response(JSON.stringify({ inserted: 0, message: 'No hay pollas activas' }), {
+  if (!pools || pools.length === 0) {
+    return new Response(JSON.stringify({ inserted: 0, message: 'No hay pollas' }), {
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  // Agrupar pool_ids por competición (evitar duplicados)
+  // Agrupar pool_ids por competición (evitar duplicados y llamadas API extra)
   const poolsByComp = new Map<string, Set<string>>(); // compCode → Set<pool_id>
-  for (const row of activeMatchRows) {
-    const compCode = (row.pools as any)?.type as string | undefined;
-    if (!compCode) continue;
+  for (const pool of pools) {
+    const compCode = pool.type as string;
     if (!poolsByComp.has(compCode)) poolsByComp.set(compCode, new Set());
-    poolsByComp.get(compCode)!.add(row.pool_id);
+    poolsByComp.get(compCode)!.add(pool.id);
   }
 
   const FOOTBALL_DATA_KEY = Deno.env.get('FOOTBALL_DATA_KEY')!;
@@ -80,14 +83,14 @@ serve(async () => {
         if (newMatches.length === 0) continue;
 
         const rows = newMatches.map((m: any) => ({
-          id:        `${poolId}_${m.id}`,
-          pool_id:   poolId,
-          home:      m.homeTeam.name,
-          away:      m.awayTeam.name,
-          date:      formatMatchDate(m.utcDate),
-          utc_date:  m.utcDate,
-          api_id:    m.id,
-          stage:     m.stage ?? 'GROUP_STAGE',
+          id:         `${poolId}_${m.id}`,
+          pool_id:    poolId,
+          home:       m.homeTeam.name,
+          away:       m.awayTeam.name,
+          date:       formatMatchDate(m.utcDate),
+          utc_date:   m.utcDate,
+          api_id:     m.id,
+          stage:      m.stage ?? 'GROUP_STAGE',
           home_score: null,
           away_score: null,
         }));
