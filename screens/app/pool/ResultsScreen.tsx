@@ -343,19 +343,17 @@ export default function ResultsScreen({ route }: any) {
           );
         })}
 
-        {/* Botón compartir — solo para partidos finalizados */}
-        {isFinished && (
-          <TouchableOpacity
-            style={[styles.shareMatchBtn, isSharingThis && styles.shareMatchBtnDisabled]}
-            onPress={() => handleShareMatch(match, preds)}
-            disabled={!!sharingMatchId}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.shareMatchBtnText}>
-              {isSharingThis ? 'Generando imagen...' : '📤  Compartir este resultado'}
-            </Text>
-          </TouchableOpacity>
-        )}
+        {/* Botón compartir — partidos finalizados y en vivo */}
+        <TouchableOpacity
+          style={[styles.shareMatchBtn, isSharingThis && styles.shareMatchBtnDisabled]}
+          onPress={() => handleShareMatch(match, preds)}
+          disabled={!!sharingMatchId}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.shareMatchBtnText}>
+            {isSharingThis ? 'Generando imagen...' : (isFinished ? '📤  Compartir este resultado' : '📤  Compartir predicciones')}
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -513,9 +511,9 @@ export default function ResultsScreen({ route }: any) {
           <View style={styles.scHeader}>
             <Text style={styles.scPoolName} numberOfLines={1}>{pool.name}</Text>
             <Text style={styles.scMatchResult}>
-              {getTeamName(shareData.match.home)}{'  '}
-              {shareData.match.homeScore} – {shareData.match.awayScore}
-              {'  '}{getTeamName(shareData.match.away)}
+              {getTeamName(shareData.match.home)}
+              {shareData.match.homeScore !== '' ? `  ${shareData.match.homeScore} – ${shareData.match.awayScore}  ` : '  ⏱️  '}
+              {getTeamName(shareData.match.away)}
             </Text>
             <Text style={styles.scMatchDate}>{shareData.match.utcDate ? formatMatchTime(shareData.match.utcDate) : shareData.match.date}</Text>
           </View>
@@ -523,7 +521,8 @@ export default function ResultsScreen({ route }: any) {
             {shareData.preds.map((p) => {
               const isMe = p.userId === user?.id;
               const hasPred = p.homeScore !== '' && p.awayScore !== '';
-              const pts = hasPred
+              const isLiveMatch = shareData.match.homeScore === '' && shareData.match.awayScore === '';
+              const pts = (!isLiveMatch && hasPred)
                 ? getMatchPoints(
                     { homeScore: p.homeScore, awayScore: p.awayScore },
                     { homeScore: shareData.match.homeScore, awayScore: shareData.match.awayScore },
@@ -531,7 +530,7 @@ export default function ResultsScreen({ route }: any) {
                     shareData.match.stage,
                   )
                 : null;
-              const badgeColor = pts !== null ? getBadgeColor(pts, maxPts) : '#CBD5E1';
+              const badgeColor = pts !== null ? getBadgeColor(pts, maxPts) : (isLiveMatch ? '#FEF9C3' : '#CBD5E1');
               return (
                 <View key={p.userId} style={styles.scRow}>
                   <Text style={[styles.scName, isMe && styles.scNameMe]} numberOfLines={1}>
@@ -539,7 +538,9 @@ export default function ResultsScreen({ route }: any) {
                   </Text>
                   <Text style={styles.scPred}>{hasPred ? `${p.homeScore} – ${p.awayScore}` : '–'}</Text>
                   <View style={[styles.scBadge, { backgroundColor: badgeColor }]}>
-                    <Text style={styles.scBadgePts}>{pts !== null ? `${pts} pts` : '–'}</Text>
+                    <Text style={[styles.scBadgePts, isLiveMatch && styles.scBadgePtsLive]}>
+                      {pts !== null ? `${pts} pts` : (isLiveMatch && hasPred ? '⏱️' : '–')}
+                    </Text>
                   </View>
                 </View>
               );
@@ -717,6 +718,7 @@ const styles = StyleSheet.create({
   scPred: { fontSize: 13, fontWeight: '700', color: '#0F172A', marginHorizontal: 12, minWidth: 44, textAlign: 'center' },
   scBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, minWidth: 52, alignItems: 'center' },
   scBadgePts: { color: 'white', fontWeight: '700', fontSize: 12 },
+  scBadgePtsLive: { color: '#92400E' },
   scFooter: { backgroundColor: '#F4EBD8', paddingVertical: 10, alignItems: 'center' },
   scFooterText: { fontSize: 12, color: '#64748B', fontWeight: '600' },
 });
