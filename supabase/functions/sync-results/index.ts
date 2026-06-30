@@ -138,8 +138,11 @@ serve(async () => {
       for (const apiMatch of finishedMatches) {
         if (!apiIds.has(apiMatch.id)) continue;
 
-        const homeScore = apiMatch.score?.fullTime?.home;
-        const awayScore = apiMatch.score?.fullTime?.away;
+        // score.regularTime existe en partidos con ET o penales y da el resultado exacto
+        // a los 90 minutos. Para partidos REGULAR no viene → caemos a score.fullTime
+        // (que en ese caso sí es el resultado a los 90').
+        const homeScore = apiMatch.score?.regularTime?.home ?? apiMatch.score?.fullTime?.home;
+        const awayScore = apiMatch.score?.regularTime?.away ?? apiMatch.score?.fullTime?.away;
         if (homeScore == null || awayScore == null) continue;
 
         const affected = matchesByApiId.get(apiMatch.id) ?? [];
