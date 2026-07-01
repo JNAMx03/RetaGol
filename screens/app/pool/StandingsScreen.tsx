@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import { useApp } from '../../../context/AppContext';
 import { supabase } from '../../../services/supabase';
 import { getMatchPoints } from '../../../utils/scoring';
@@ -19,6 +20,7 @@ const PODIUM_EMOJIS = ['🥇', '🥈', '🥉'];
 export default function StandingsScreen({ route }: any) {
   const { pool } = route.params;
   const { user } = useApp();
+  const navigation = useNavigation<any>();
   const [ranking, setRanking] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -119,6 +121,16 @@ export default function StandingsScreen({ route }: any) {
     }
   };
 
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity onPress={handleShare} disabled={sharing} style={{ paddingHorizontal: 14, paddingVertical: 8 }}>
+          <Text style={{ fontSize: 20, opacity: sharing ? 0.4 : 1 }}>📤</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [sharing]);
+
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#149435" /></View>;
   if (loadError) return (
     <View style={styles.center}>
@@ -129,18 +141,6 @@ export default function StandingsScreen({ route }: any) {
   return (
     <View style={styles.root}>
       <ScrollView style={styles.container} contentContainerStyle={styles.list}>
-        {/* Botón compartir */}
-        <TouchableOpacity
-          style={[styles.shareBtn, sharing && styles.shareBtnDisabled]}
-          onPress={handleShare}
-          disabled={sharing}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.shareBtnText}>
-            {sharing ? 'Generando imagen...' : '📤  Compartir clasificación'}
-          </Text>
-        </TouchableOpacity>
-
         <View style={styles.tableHeader}>
           <Text style={styles.colHash}>#</Text>
           <Text style={styles.colName}>Participante</Text>
@@ -215,15 +215,6 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F4EBD8', padding: 24 },
   errorText: { color: '#64748B', textAlign: 'center', fontSize: 14, lineHeight: 22 },
   list: { padding: 16 },
-
-  // Botón compartir
-  shareBtn: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    backgroundColor: '#F0FDF4', borderRadius: 10, paddingVertical: 11,
-    borderWidth: 1.5, borderColor: '#86EFAC', marginBottom: 16,
-  },
-  shareBtnDisabled: { opacity: 0.5 },
-  shareBtnText: { color: '#149435', fontWeight: '700', fontSize: 14 },
 
   // Tabla
   tableHeader: {

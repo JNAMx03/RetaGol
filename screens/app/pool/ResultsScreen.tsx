@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp, Match } from '../../../context/AppContext';
@@ -32,6 +33,14 @@ interface DaySection {
   totalCount: number;
   totalPts: number;
   data: Match[];
+}
+
+interface ChampionPickRow {
+  userId: string;
+  name: string;
+  champion: string | null;
+  runnerUp: string | null;
+  thirdPlace: string | null;
 }
 
 // ─── Helpers de fecha ─────────────────────────────────────────────────────────
@@ -85,6 +94,11 @@ export default function ResultsScreen({ route }: any) {
   // Dos niveles de acordeón: secciones de fecha (finalizados) y partidos expandidos
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [expandedMatches, setExpandedMatches] = useState<Set<string>>(new Set());
+
+  // ── Picks de campeón de todos los participantes ────────────────────────────
+  const [championOpen, setChampionOpen] = useState(false);
+  const [championPicks, setChampionPicks] = useState<ChampionPickRow[]>([]);
+  const [loadingChampion, setLoadingChampion] = useState(false);
 
   // ── Compartir partido ──────────────────────────────────────────────────────
   const [shareData, setShareData] = useState<{ match: Match; preds: ParticipantPred[] } | null>(null);
@@ -240,6 +254,71 @@ export default function ResultsScreen({ route }: any) {
       }
       return next;
     });
+  };
+
+  // Resultado real del torneo — derivado de la final y el tercer puesto
+  const actualResult = useMemo(() => {
+    const finalMatch = finishedMatches.find((m) => m.stage === 'FINAL');
+    if (!finalMatch || finalMatch.homeScore === '' || finalMatch.awayScore === '') return null;
+    const h = parseInt(finalMatch.homeScore), a = parseInt(finalMatch.awayScore);
+    if (h === a) return null; // empate en 90' (fue a penales) — no podemos determinar campeón
+    const thirdMatch = finishedMatches.find(
+      (m) => m.stage === 'THIRD_PLACE' || m.stage === 'THIRD_PLACE_MATCH',
+    );
+    let thirdPlace: string | null = null;
+    if (thirdMatch && thirdMatch.homeScore !== '' && thirdMatch.awayScore !== '') {
+      const h3 = parseInt(thirdMatch.homeScore), a3 = parseInt(thirdMatch.awayScore);
+      if (h3 !== a3) thirdPlace = h3 > a3 ? thirdMatch.home : thirdMatch.away;
+    }
+    return {
+      champion:  h > a ? finalMatch.home : finalMatch.away,
+      runnerUp:  h > a ? finalMatch.away : finalMatch.home,
+      thirdPlace,
+    };
+  }, [finishedMatches]);
+
+  const handleToggleChampion = () => {
+    if (championOpen) { setChampionOpen(false); return; }
+    Alert.alert(
+      '¿Ver los picks de todos?',
+      'Vas a ver las predicciones de campeón de todos los participantes. ¿Seguro que querés continuar? 😬',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Ver igual',
+          onPress: async () => {
+            setChampionOpen(true);
+            if (championPicks.length > 0) return;
+            setLoadingChampion(true);
+            try {
+              const { data } = await supabase
+                .from('pool_champion_predictions')
+                .select('user_id, champion, runner_up, third_place, profiles(name)')
+                .eq('pool_id', pool.id);
+              if (data) {
+                const parsed: ChampionPickRow[] = data.map((p: any) => ({
+                  userId:     p.user_id,
+                  name:       p.profiles?.name ?? 'Usuario',
+                  champion:   p.champion    ?? null,
+                  runnerUp:   p.runner_up   ?? null,
+                  thirdPlace: p.third_place ?? null,
+                }));
+                parsed.sort((a, b) => {
+                  if (a.userId === user?.id) return -1;
+                  if (b.userId === user?.id) return 1;
+                  return a.name.localeCompare(b.name);
+                });
+                setChampionPicks(parsed);
+              }
+            } catch (e) {
+              console.log('Error cargando picks de campeón:', e);
+            } finally {
+              setLoadingChampion(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const toggleSection = (key: string) => {
@@ -440,6 +519,64 @@ export default function ResultsScreen({ route }: any) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#149435']} />}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Sección: Predicción final del torneo ──────────────────────────── */}
+        {pool.championConfig?.enabled && (
+          <View style={styles.championBlock}>
+            <TouchableOpacity
+              style={styles.championHeader}
+              onPress={handleToggleChampion}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.championHeaderText}>🏆  Predicción final del torneo</Text>
+              <Text style={styles.chevron}>{championOpen ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+
+            {championOpen && (
+              <View style={styles.championBody}>
+                {loadingChampion ? (
+                  <ActivityIndicator color="#149435" style={{ paddingVertical: 16 }} />
+                ) : championPicks.length === 0 ? (
+                  <Text style={styles.championEmpty}>Nadie ha elegido campeón aún</Text>
+                ) : (
+                  championPicks.map((pick) => {
+                    const isMe = pick.userId === user?.id;
+                    const items = [
+                      { emoji: '🥇', label: 'Campeón',    val: pick.champion,   actual: actualResult?.champion   ?? null },
+                      { emoji: '🥈', label: 'Subcampeón', val: pick.runnerUp,   actual: actualResult?.runnerUp   ?? null },
+                      { emoji: '🥉', label: '3er lugar',  val: pick.thirdPlace, actual: actualResult?.thirdPlace ?? null },
+                    ];
+                    return (
+                      <View key={pick.userId} style={[styles.championCard, isMe && styles.championCardMe]}>
+                        <Text style={[styles.championName, isMe && styles.championNameMe]} numberOfLines={1}>
+                          {isMe ? '⭐ Tú' : pick.name}
+                        </Text>
+                        {items.map(({ emoji, label, val, actual }) => {
+                          const hit  = actual !== null && val !== null && val === actual;
+                          const miss = actual !== null && val !== null && val !== actual;
+                          return (
+                            <View key={label} style={styles.championPickRow}>
+                              <Text style={styles.championPickEmoji}>{emoji}</Text>
+                              <Text style={styles.championPickLabel}>{label}</Text>
+                              <Text
+                                style={[styles.championPickTeam, hit && styles.championPickHit, miss && styles.championPickMiss]}
+                                numberOfLines={1}
+                              >
+                                {val ? getTeamName(val) : '–'}
+                              </Text>
+                              {hit  && <Text style={styles.championResultIcon}>✅</Text>}
+                              {miss && <Text style={styles.championResultIcon}>❌</Text>}
+                            </View>
+                          );
+                        })}
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
         {/* ── Sección: En curso ─────────────────────────────────────────────── */}
         {inProgressMatches.length > 0 && (
           <View style={styles.groupBlock}>
@@ -721,4 +858,34 @@ const styles = StyleSheet.create({
   scBadgePtsLive: { color: '#92400E' },
   scFooter: { backgroundColor: '#F4EBD8', paddingVertical: 10, alignItems: 'center' },
   scFooterText: { fontSize: 12, color: '#64748B', fontWeight: '600' },
+
+  // ── Acordeón: Predicción final del torneo ─────────────────────────────────
+  championBlock: {
+    marginHorizontal: 16, marginTop: 16,
+    borderRadius: 12, backgroundColor: '#FAF7F2',
+    borderWidth: 1, borderColor: '#DADADA',
+    overflow: 'hidden',
+  },
+  championHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#DADADA', paddingHorizontal: 14, paddingVertical: 12,
+  },
+  championHeaderText: { fontSize: 14, fontWeight: '700', color: '#374151' },
+  chevron: { fontSize: 12, color: '#374151' },
+  championBody: { paddingHorizontal: 12, paddingVertical: 8 },
+  championEmpty: { textAlign: 'center', color: '#64748B', paddingVertical: 12, fontSize: 13 },
+  championCard: {
+    marginVertical: 6, padding: 10, borderRadius: 10,
+    backgroundColor: 'white', borderWidth: 1, borderColor: '#E5E7EB',
+  },
+  championCardMe: { borderColor: '#149435', borderWidth: 1.5 },
+  championName: { fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 6 },
+  championNameMe: { color: '#149435' },
+  championPickRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  championPickEmoji: { fontSize: 16, width: 24 },
+  championPickLabel: { fontSize: 12, color: '#64748B', width: 82 },
+  championPickTeam: { flex: 1, fontSize: 13, fontWeight: '600', color: '#374151' },
+  championPickHit: { color: '#149435' },
+  championPickMiss: { color: '#B91C1C' },
+  championResultIcon: { fontSize: 14, marginLeft: 6 },
 });

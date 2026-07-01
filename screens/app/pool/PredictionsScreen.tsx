@@ -6,6 +6,7 @@ import {
   Text,
   TextInput,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useState, useEffect, useMemo } from 'react';
 import { useApp, Match } from '../../../context/AppContext';
@@ -310,9 +311,16 @@ export default function PredictionsScreen({ route }: any) {
       const filledMatches = matches.filter(
         (m) => !lockedIds.has(m.id) && (m.homeScore !== '' || m.awayScore !== ''),
       );
-      await savePredictionsByPool(pool.id, filledMatches);
-      setSavedMsg(true);
-      setTimeout(() => setSavedMsg(false), 2500);
+      const { skipped } = await savePredictionsByPool(pool.id, filledMatches);
+      if (skipped > 0) {
+        Alert.alert(
+          'Predicciones parciales',
+          `${skipped} partido${skipped !== 1 ? 's' : ''} ya ${skipped !== 1 ? 'empezaron' : 'empezó'} y no ${skipped !== 1 ? 'se pudieron guardar' : 'se pudo guardar'}. Los demás quedaron guardados.`,
+        );
+      } else {
+        setSavedMsg(true);
+        setTimeout(() => setSavedMsg(false), 2500);
+      }
     } catch (e) {
       console.log('Error guardando predicciones:', e);
     } finally {

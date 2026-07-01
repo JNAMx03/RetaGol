@@ -69,7 +69,7 @@ interface AppContextType {
   joinPool: (code: string) => Promise<Pool>;
   predictions: Record<string, Record<string, Match[]>>;
   getPredictionsByPool: (poolId: string) => Match[];
-  savePredictionsByPool: (poolId: string, matches: Match[]) => Promise<void>;
+  savePredictionsByPool: (poolId: string, matches: Match[]) => Promise<{ skipped: number }>;
   updateProfile: (updates: { name?: string }) => Promise<void>;
   clearAllData: () => Promise<void>;
   loading: boolean;
@@ -612,10 +612,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return predictions[poolId]?.[user?.id ?? ''] || [];
   };
 
-  const savePredictionsByPool = async (poolId: string, matches: Match[]) => {
-    if (!user) return;
+  const savePredictionsByPool = async (poolId: string, matches: Match[]): Promise<{ skipped: number }> => {
+    if (!user) return { skipped: 0 };
 
-    const rows = matches.map((m) => ({
+    // Filtrar partidos que ya empezaron — el RLS del servidor también lo bloquea,
+    // pero filtramos acá para UX y para saber cuántos se saltaron.
+    const now = new Date();
+    const validMatches = matches.filter(
+      (m) => !m.utcDate || new Date(m.utcDate) > now,
+    );
+    const skipped = matches.length - validMatches.length;
+
+    if (validMatches.length === 0) return { skipped };
+
+    const rows = validMatches.map((m) => ({
       pool_id: poolId,
       match_id: m.id,
       user_id: user.id,
@@ -632,8 +642,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Actualizar caché local
     setPredictions((prev) => ({
       ...prev,
-      [poolId]: { ...prev[poolId], [user.id]: matches },
+      [poolId]: { ...prev[poolId], [user.id]: validMatches },
     }));
+
+    return { skipped };
   };
 
   // ─── Perfil ─────────────────────────────────────────────────────────────────
